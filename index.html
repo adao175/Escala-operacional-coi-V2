@@ -55,6 +55,8 @@ button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit
 .bt.perigo{color:var(--alerta);border-color:#e8bfbc}
 .bt.laranja{background:var(--extra);border-color:var(--extra);color:#fff}
 .bt.laranja:hover{background:#8a5108}
+.bt.verde{background:#1a7a4c;border-color:#1a7a4c;color:#fff}
+.bt.verde:hover{background:#145f3b}
 .bt:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--azul);outline-offset:1px}
 body.modo-edicao .cel:focus-visible{outline:2px solid var(--azul);outline-offset:1px}
 
@@ -380,7 +382,7 @@ body.foco-ativo{overflow:hidden}
       <input type="file" id="arquivoJson" accept=".json" multiple hidden>
     </div>
     <button class="bt fantasma" id="btAbrirEdicao">Editar escala</button>
-    <button class="bt laranja esconde" id="btSalvarAlteracoes" title="Salva tudo o que você alterou nessa sessão — edições manuais, ausências, dados de operadores etc. — neste navegador, sem gerar arquivo.">Salvar alterações</button>
+    <button class="bt laranja esconde" id="btSalvarAlteracoes" title="Salva neste navegador e publica automaticamente no GitHub — todo mundo já vê a versão nova.">Salvar alterações</button>
     <button class="bt fantasma esconde" id="btSairEdicao" style="color:#f5a09b;border-color:#6e3a37">Sair da edição</button>
   </div>
 </header>
@@ -720,6 +722,34 @@ body.foco-ativo{overflow:hidden}
     <div class="botoes">
       <button class="bt" id="btCancelarImportar">Cancelar</button>
       <button class="bt primario" id="btConfirmarImportar">Importar selecionadas</button>
+    </div>
+  </div>
+</div>
+
+<div class="editor esconde" id="modalGithubCfg">
+  <div class="caixa" style="width:min(460px,100%)">
+    <h3>Publicação automática no GitHub</h3>
+    <p class="sub">Essa credencial fica salva <b>só neste navegador</b> (nunca é publicada, nunca vai pro <code>index.html</code> nem pro <code>dados.json</code>). Use um token com acesso restrito só a este repositório.</p>
+    <div class="campo"><label for="ghCfgOwner">Usuário ou organização do GitHub</label>
+      <input id="ghCfgOwner" type="text" placeholder="ex: adao175" value="adao175" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:var(--r)"></div>
+    <div class="campo" style="margin-top:8px"><label for="ghCfgRepo">Repositório</label>
+      <input id="ghCfgRepo" type="text" placeholder="ex: ESCALA-OPERACIONAL" value="ESCALA-OPERACIONAL" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:var(--r)"></div>
+    <div class="campo" style="margin-top:8px"><label for="ghCfgBranch">Branch</label>
+      <input id="ghCfgBranch" type="text" placeholder="main" value="main" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:var(--r)"></div>
+    <div class="campo" style="margin-top:8px"><label for="ghCfgPath">Caminho do arquivo de dados</label>
+      <input id="ghCfgPath" type="text" placeholder="dados.json" value="dados.json" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:var(--r)"></div>
+    <div class="campo" style="margin-top:8px"><label for="ghCfgToken">Token de acesso pessoal</label>
+      <input id="ghCfgToken" type="password" autocomplete="off" placeholder="ghp_... ou github_pat_..." style="width:100%;padding:9px;border:1px solid var(--line);border-radius:var(--r)"></div>
+    <p class="dica" style="margin-top:8px">
+      Crie um <b>token de acesso pessoal refinado (fine-grained)</b> em
+      <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a>,
+      restrito só a este repositório, com permissão apenas de "Contents: Read and write", e com validade curta (ex.: 90 dias). Assim, mesmo se algo der errado, o estrago fica bem limitado.
+    </p>
+    <p id="ghCfgErro" class="dica esconde" style="color:var(--alerta);margin-top:6px"></p>
+    <div class="botoes" style="margin-top:10px">
+      <button class="bt perigo" id="btGhCfgRemover" style="margin-right:auto">Remover credencial deste navegador</button>
+      <button class="bt" id="btCancelarGhCfg">Cancelar</button>
+      <button class="bt primario" id="btSalvarGhCfg">Salvar e publicar</button>
     </div>
   </div>
 </div>
@@ -3379,11 +3409,19 @@ function persistirBackup() {
   try { localStorage.setItem(CHAVE_BACKUP, JSON.stringify(dados)); return true; }
   catch (e) { return false; }
 }
-function salvarAlteracoes() {
+async function salvarAlteracoes() {
   const ok = persistirBackup();
-  aviso(ok
-    ? 'Alterações salvas neste navegador.'
-    : 'Não consegui salvar neste navegador (armazenamento local indisponível). Use "Salvar arquivo" pra não perder o trabalho.');
+  if (!ok) {
+    aviso('Não consegui salvar neste navegador (armazenamento local indisponível). Use "Salvar arquivo" pra não perder o trabalho.');
+    return;
+  }
+  const cfg = lerConfigGithub();
+  if (!cfg || !cfg.token) {
+    aviso('Alterações salvas neste navegador. Configure a publicação automática pra também ir pro site de todo mundo.');
+    abrirModalGithubCfg();
+    return;
+  }
+  await executarPublicacao();
 }
 // "Salvar arquivo": salva o backup local E também baixa o .json.
 function salvar() {
@@ -3645,6 +3683,120 @@ $('#btConfirmarImportar').onclick = () => {
   fecharModalImportar();
   aviso(`${marcados.length} escala(s) importada(s) e mescladas ao histórico.`);
 };
+
+/* ═══════════ publicação automática no GitHub (opcional) ═══════════
+   A credencial fica só no localStorage DESTE navegador — nunca entra no
+   dadosDoProjeto() nem em nenhum arquivo exportado/publicado, então nunca
+   viaja pro dados.json nem pro index.html que os outros recebem. Só quem
+   configurar aqui, no próprio navegador, consegue publicar; visitantes do
+   site não têm acesso a nada disso. */
+const CHAVE_GITHUB_CFG = 'coi_escala_github_cfg';
+function lerConfigGithub() {
+  try { return JSON.parse(localStorage.getItem(CHAVE_GITHUB_CFG) || 'null'); } catch (e) { return null; }
+}
+function salvarConfigGithub(cfg) { try { localStorage.setItem(CHAVE_GITHUB_CFG, JSON.stringify(cfg)); } catch (e) { /* sem storage disponível */ } }
+function removerConfigGithub() { try { localStorage.removeItem(CHAVE_GITHUB_CFG); } catch (e) { /* nada a fazer */ } }
+function b64EncodeUtf8(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+function dadosFiltradosPor(chavesMes, querRef) {
+  const dados = dadosDoProjeto();
+  dados.mesReferencia = querRef ? S.mesReferencia : null;
+  const historicoFiltrado = {};
+  chavesMes.forEach(chave => { if (S.historico[chave]) historicoFiltrado[chave] = S.historico[chave]; });
+  dados.historico = historicoFiltrado;
+  const manualFiltrado = {}, corManualFiltrado = {};
+  const prefixos = chavesMes.map(chave => { const [a, m] = chave.split('-'); return `${Number(a)}-${Number(m)}|`; });
+  Object.keys(S.manual).forEach(k => { if (prefixos.some(p => k.startsWith(p))) manualFiltrado[k] = S.manual[k]; });
+  Object.keys(S.corManual).forEach(k => { if (prefixos.some(p => k.startsWith(p))) corManualFiltrado[k] = S.corManual[k]; });
+  dados.manual = manualFiltrado; dados.corManual = corManualFiltrado;
+  return dados;
+}
+async function publicarNoGithub(dadosParaPublicar) {
+  const cfg = lerConfigGithub();
+  if (!cfg || !cfg.token || !cfg.owner || !cfg.repo) { abrirModalGithubCfg(); return false; }
+  const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${cfg.path || 'dados.json'}`;
+  try {
+    const shaResp = await fetch(url + '?ref=' + encodeURIComponent(cfg.branch || 'main'), {
+      headers: { 'Authorization': 'token ' + cfg.token, 'Accept': 'application/vnd.github.v3+json' }
+    });
+    let sha;
+    if (shaResp.status === 401 || shaResp.status === 403) throw new Error('Token inválido, expirado ou sem permissão nesse repositório.');
+    if (shaResp.ok) sha = (await shaResp.json()).sha;
+    else if (shaResp.status !== 404) throw new Error('Não consegui ler o arquivo atual no GitHub (código ' + shaResp.status + ').');
+
+    const corpo = { message: 'Escala atualizada em ' + new Date().toLocaleString('pt-BR'),
+      content: b64EncodeUtf8(JSON.stringify(dadosParaPublicar, null, 1)), branch: cfg.branch || 'main' };
+    if (sha) corpo.sha = sha;
+    const putResp = await fetch(url, {
+      method: 'PUT',
+      headers: { 'Authorization': 'token ' + cfg.token, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(corpo)
+    });
+    if (!putResp.ok) {
+      const err = await putResp.json().catch(() => ({}));
+      if (putResp.status === 409) throw new Error('Alguém publicou uma versão mais nova enquanto você editava. Recarregue a página e tente de novo.');
+      throw new Error(err.message || ('Erro ' + putResp.status + ' ao publicar.'));
+    }
+    return true;
+  } catch (e) {
+    aviso('❌ Não consegui publicar no GitHub: ' + e.message);
+    return false;
+  }
+}
+// Valores padrão do repositório — não são segredo (já aparecem na própria
+// URL do site publicado), só poupam cada supervisor de digitar isso toda
+// vez. O único campo que cada um precisa preencher de próprio punho é o
+// token, que é pessoal e fica só no navegador de quem o colou.
+const CONFIG_PUBLICACAO_PADRAO = { owner: 'adao175', repo: 'ESCALA-OPERACIONAL', branch: 'main', path: 'dados.json' };
+function preencherModalGithubCfg() {
+  const cfg = lerConfigGithub() || {};
+  $('#ghCfgOwner').value = cfg.owner || CONFIG_PUBLICACAO_PADRAO.owner;
+  $('#ghCfgRepo').value = cfg.repo || CONFIG_PUBLICACAO_PADRAO.repo;
+  $('#ghCfgBranch').value = cfg.branch || CONFIG_PUBLICACAO_PADRAO.branch;
+  $('#ghCfgPath').value = cfg.path || CONFIG_PUBLICACAO_PADRAO.path;
+  $('#ghCfgToken').value = '';
+  $('#ghCfgErro').classList.add('esconde');
+}
+function abrirModalGithubCfg() { preencherModalGithubCfg(); $('#modalGithubCfg').classList.remove('esconde'); }
+function fecharModalGithubCfg() { $('#modalGithubCfg').classList.add('esconde'); }
+$('#btCancelarGhCfg').onclick = fecharModalGithubCfg;
+$('#modalGithubCfg').onclick = e => { if (e.target.id === 'modalGithubCfg') fecharModalGithubCfg(); };
+$('#btGhCfgRemover').onclick = () => {
+  if (!confirm('Remover a credencial salva neste navegador? Você vai precisar configurar de novo pra publicar automaticamente.')) return;
+  removerConfigGithub();
+  fecharModalGithubCfg();
+  aviso('Credencial removida deste navegador.');
+};
+$('#btSalvarGhCfg').onclick = async () => {
+  const owner = $('#ghCfgOwner').value.trim(), repo = $('#ghCfgRepo').value.trim();
+  const branch = $('#ghCfgBranch').value.trim() || 'main', path = $('#ghCfgPath').value.trim() || 'dados.json';
+  const tokenDigitado = $('#ghCfgToken').value.trim();
+  const cfgAtual = lerConfigGithub();
+  const token = tokenDigitado || (cfgAtual && cfgAtual.token) || '';
+  if (!owner || !repo || !token) {
+    $('#ghCfgErro').textContent = 'Preencha pelo menos usuário/organização, repositório e token.';
+    $('#ghCfgErro').classList.remove('esconde');
+    return;
+  }
+  salvarConfigGithub({ owner, repo, branch, path, token });
+  fecharModalGithubCfg();
+  await executarPublicacao();
+};
+async function executarPublicacao() {
+  const btn = $('#btSalvarAlteracoes');
+  const chaves = historicoOrdenado().map(m => chaveMes(m.ano, m.mes));
+  const dados = dadosFiltradosPor(chaves, true);
+  const textoOriginal = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Publicando…';
+  persistirBackup();
+  const ok = await publicarNoGithub(dados);
+  btn.disabled = false; btn.textContent = textoOriginal;
+  if (ok) aviso('✅ Salvo e publicado! O site atualiza pra todo mundo em instantes.');
+}
 
 function restaurarBackup() {
   let bruto;
