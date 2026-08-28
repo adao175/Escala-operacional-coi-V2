@@ -273,6 +273,7 @@ table.lista .cx{width:auto;min-width:0}
 .editor select{width:100%;padding:9px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
 .editor .campo label{margin-bottom:2px}
 .editor input{width:100%;padding:10px;border:1px solid var(--line);border-radius:var(--r);font-family:var(--mono);font-size:15px;letter-spacing:.12em;text-transform:uppercase}
+#modalAdmin input{text-transform:none;letter-spacing:normal;font-family:var(--sans)}
 .editor .botoes{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
 .editor .caixa.tremendo{animation:tremorCaixa .4s}
 @keyframes tremorCaixa{10%,90%{transform:translateX(-1px)}20%,80%{transform:translateX(2px)}30%,50%,70%{transform:translateX(-4px)}40%,60%{transform:translateX(4px)}}
@@ -2602,7 +2603,17 @@ function desenharCadastro() {
         if (String(o[prop] ?? '') === String(v)) op2.selected = true;
         s.appendChild(op2);
       });
-      s.onchange = () => { o[prop] = s.value; desenharCadastro(); };
+      s.onchange = () => {
+        o[prop] = s.value;
+        // Se a prioridade daquele polo ainda estiver no padrão "sem definir"
+        // (99), acompanha a troca de polo sugerindo a próxima da sequência.
+        if (prop === 'principal' && Number(o.prioridade_polo_principal) === 99) {
+          o.prioridade_polo_principal = proximaPrioridadePolo('prioridade_polo_principal', s.value);
+        } else if (prop === 'secundario' && Number(o.prioridade_polo_secundario) === 99) {
+          o.prioridade_polo_secundario = proximaPrioridadePolo('prioridade_polo_secundario', s.value);
+        }
+        desenharCadastro();
+      };
       return s;
     };
 
@@ -4282,8 +4293,23 @@ document.querySelectorAll('input[name="modoGeracao"]').forEach(r => {
     atualizarModoGeracao();
   };
 });
+// Próxima prioridade livre para um polo: pega o maior valor já usado por
+// quem tem esse polo como principal/secundário e soma 1. 99 é o valor
+// "sem prioridade definida" (padrão de operador novo) e não conta, senão
+// toda inclusão pularia direto pra 100.
+function proximaPrioridadePolo(campo, polo) {
+  const propPolo = campo === 'prioridade_polo_principal' ? 'principal' : 'secundario';
+  const usados = S.ops
+    .filter(o => o[propPolo] === polo && Number(o[campo]) !== 99)
+    .map(o => Number(o[campo]) || 0);
+  return usados.length ? Math.max(...usados) + 1 : 1;
+}
 $('#btNovoOp').onclick = () => {
-  S.ops.unshift(normalizarOp({ letra: '?', nome: 'Novo operador', principal: 'Aracaju - 2', secundario: 'Aracaju - 2' }));
+  const principal = 'Aracaju - 2', secundario = 'Aracaju - 2';
+  const novo = normalizarOp({ letra: '?', nome: 'Novo operador', principal, secundario });
+  novo.prioridade_polo_principal = proximaPrioridadePolo('prioridade_polo_principal', principal);
+  novo.prioridade_polo_secundario = proximaPrioridadePolo('prioridade_polo_secundario', secundario);
+  S.ops.unshift(novo);
   desenharCadastro();
   const corpo = $('#tabelaOps').closest('.corpo');
   if (corpo) corpo.scrollTop = 0;
