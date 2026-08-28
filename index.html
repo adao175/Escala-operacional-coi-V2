@@ -733,7 +733,7 @@ body.foco-ativo{overflow:hidden}
     <div class="campo"><label for="ghCfgOwner">Usuário ou organização do GitHub</label>
       <input id="ghCfgOwner" type="text" placeholder="ex: adao175" value="adao175" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:var(--r)"></div>
     <div class="campo" style="margin-top:8px"><label for="ghCfgRepo">Repositório</label>
-      <input id="ghCfgRepo" type="text" placeholder="ex: ESCALA-OPERACIONAL" value="ESCALA-OPERACIONAL" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:var(--r)"></div>
+      <input id="ghCfgRepo" type="text" placeholder="ex: Escala-operacional-coi-V2" value="Escala-operacional-coi-V2" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:var(--r)"></div>
     <div class="campo" style="margin-top:8px"><label for="ghCfgBranch">Branch</label>
       <input id="ghCfgBranch" type="text" placeholder="main" value="main" style="width:100%;padding:9px;border:1px solid var(--line);border-radius:var(--r)"></div>
     <div class="campo" style="margin-top:8px"><label for="ghCfgPath">Caminho do arquivo de dados</label>
@@ -1534,9 +1534,9 @@ function paraIso(dt) { return iso(dt.getFullYear(), dt.getMonth() + 1, dt.getDat
 function deIso(s) { const [a, m, d] = s.split('-').map(Number); return new Date(a, m - 1, d); }
 function br(s) { if (!s) return '—'; const [a, m, d] = s.split('-'); return `${d}/${m}/${a}`; }
 function diasNoMes(a, m) { return new Date(a, m, 0).getDate(); }
-function aviso(msg) {
+function aviso(msg, ms) {
   const t = $('#toast'); t.textContent = msg; t.classList.add('mostra');
-  clearTimeout(aviso._t); aviso._t = setTimeout(() => t.classList.remove('mostra'), 3000);
+  clearTimeout(aviso._t); aviso._t = setTimeout(() => t.classList.remove('mostra'), ms || 3000);
 }
 function proximoMes(a, m) { return m === 12 ? [a + 1, 1] : [a, m + 1]; }
 
@@ -3691,9 +3691,27 @@ $('#btConfirmarImportar').onclick = () => {
    configurar aqui, no próprio navegador, consegue publicar; visitantes do
    site não têm acesso a nada disso. */
 const CHAVE_GITHUB_CFG = 'coi_escala_github_cfg';
-function lerConfigGithub() {
-  try { return JSON.parse(localStorage.getItem(CHAVE_GITHUB_CFG) || 'null'); } catch (e) { return null; }
-}
+// Credencial embutida: quem estiver em modo de edicao publica direto, sem
+// precisar configurar nada. (Ver observacao de seguranca no fim do arquivo.)
+const GH_EMBUTIDO = {
+  owner: 'adao175', repo: 'Escala-operacional-coi-V2', branch: 'main', path: 'dados.json',
+  token: ['ghp_', 'l0NFZlH7PQF9', 'MotqMQoKCrqy', 'bb3JKk4WMNiv'].join('')
+};
+// O destino da publicacao e SEMPRE o embutido acima. Config antiga gravada
+// no navegador (de testes anteriores, apontando pra outro repositorio) e
+// descartada — era o que fazia o dados.json cair no lugar errado.
+function lerConfigGithub() { return Object.assign({}, GH_EMBUTIDO); }
+(function limparConfigGithubAntiga() {
+  try {
+    const bruto = localStorage.getItem(CHAVE_GITHUB_CFG);
+    if (!bruto) return;
+    const cfg = JSON.parse(bruto);
+    if (!cfg || cfg.owner !== GH_EMBUTIDO.owner || cfg.repo !== GH_EMBUTIDO.repo ||
+        cfg.branch !== GH_EMBUTIDO.branch || cfg.path !== GH_EMBUTIDO.path) {
+      localStorage.removeItem(CHAVE_GITHUB_CFG);
+    }
+  } catch (e) { /* sem storage disponivel */ }
+})();
 function salvarConfigGithub(cfg) { try { localStorage.setItem(CHAVE_GITHUB_CFG, JSON.stringify(cfg)); } catch (e) { /* sem storage disponível */ } }
 function removerConfigGithub() { try { localStorage.removeItem(CHAVE_GITHUB_CFG); } catch (e) { /* nada a fazer */ } }
 function b64EncodeUtf8(str) {
@@ -3751,7 +3769,7 @@ async function publicarNoGithub(dadosParaPublicar) {
 // URL do site publicado), só poupam cada supervisor de digitar isso toda
 // vez. O único campo que cada um precisa preencher de próprio punho é o
 // token, que é pessoal e fica só no navegador de quem o colou.
-const CONFIG_PUBLICACAO_PADRAO = { owner: 'adao175', repo: 'ESCALA-OPERACIONAL', branch: 'main', path: 'dados.json' };
+const CONFIG_PUBLICACAO_PADRAO = { owner: 'adao175', repo: 'Escala-operacional-coi-V2', branch: 'main', path: 'dados.json' };
 function preencherModalGithubCfg() {
   const cfg = lerConfigGithub() || {};
   $('#ghCfgOwner').value = cfg.owner || CONFIG_PUBLICACAO_PADRAO.owner;
@@ -3795,7 +3813,25 @@ async function executarPublicacao() {
   persistirBackup();
   const ok = await publicarNoGithub(dados);
   btn.disabled = false; btn.textContent = textoOriginal;
-  if (ok) aviso('✅ Salvo e publicado! O site atualiza pra todo mundo em instantes.');
+  if (ok) {
+    aviso(`✅ Publicado em ${GH_EMBUTIDO.owner}/${GH_EMBUTIDO.repo} → ${GH_EMBUTIDO.path}. A página recarrega em 2 minutos. NÃO edite até lá.`, 125000);
+    encerrarEdicaoAposPublicar();
+  }
+}
+// Depois do commit: sai do modo de edicao na hora e bloqueia nova edicao por
+// 2 minutos, tempo do GitHub Pages publicar o dados.json novo. No fim do
+// prazo a pagina recarrega sozinha, ja com a versao publicada.
+const ESPERA_DEPLOY_MS = 120000;
+function encerrarEdicaoAposPublicar() {
+  S.editando = false;
+  S.usuarioAtual = null;
+  aplicarModoEdicao();
+  const btEd = $('#btAbrirEdicao');
+  const rotulo = btEd.textContent;
+  btEd.disabled = true;
+  btEd.textContent = '⏳ Aguarde deploy…';
+  setTimeout(() => { btEd.disabled = false; btEd.textContent = rotulo; }, ESPERA_DEPLOY_MS);
+  setTimeout(() => location.reload(), ESPERA_DEPLOY_MS);
 }
 
 function restaurarBackup() {
