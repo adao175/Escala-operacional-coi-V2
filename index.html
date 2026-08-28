@@ -3398,7 +3398,8 @@ function dadosDoProjeto() {
     minDiurno: S.minDiurno, mesIni: S.mesIni, nMeses: S.nMeses, compactaFolga: S.compactaFolga,
     manual: S.manual, estadoInicial: S.estadoInicial, idx: S.idx, turnosOcultos: Array.from(S.turnosOcultos),
     atualizadoEm: S.atualizadoEm, atualizadoPor: S.atualizadoPor, corManual: S.corManual,
-    mesReferencia: S.mesReferencia, equilibrarFds: S.equilibrarFds, historico: S.historico
+    mesReferencia: S.mesReferencia, equilibrarFds: S.equilibrarFds, historico: S.historico,
+    admins: carregarAdmins()
   };
 }
 // Salva tudo no localStorage (backup local do navegador), sem gerar/baixar
@@ -3500,6 +3501,7 @@ function carregarProjeto(d) {
   S.mesReferencia = d.mesReferencia || null;
   S.equilibrarFds = !!d.equilibrarFds;
   S.historico = d.historico || {};
+  if (Array.isArray(d.admins)) mesclarAdmins(d.admins);
 }
 function abrir(arquivo) {
   const fr = new FileReader();
@@ -3940,6 +3942,25 @@ function carregarAdmins() {
   try { return JSON.parse(localStorage.getItem(CHAVE_ADMINS) || '[]'); } catch (e) { return []; }
 }
 function salvarAdmins(lista) { localStorage.setItem(CHAVE_ADMINS, JSON.stringify(lista)); }
+// A lista de logins viaja dentro do dados.json publicado, entao quem cadastrar
+// num computador consegue entrar em qualquer outro. Ao carregar, a lista
+// publicada vale; logins que existem so neste navegador (cadastrados agora,
+// ainda nao publicados) sao mantidos.
+function mesclarAdmins(publicados) {
+  const mapa = new Map();
+  publicados.forEach(a => { if (a && a.login && a.hash) mapa.set(a.login.toLowerCase(), a); });
+  carregarAdmins().forEach(a => {
+    if (a && a.login && !mapa.has(a.login.toLowerCase())) mapa.set(a.login.toLowerCase(), a);
+  });
+  salvarAdmins(Array.from(mapa.values()));
+}
+// Publica so a lista de logins, sem travar a edicao nem recarregar a pagina.
+async function publicarListaAdmins() {
+  const chaves = historicoOrdenado().map(m => chaveMes(m.ano, m.mes));
+  const ok = await publicarNoGithub(dadosFiltradosPor(chaves, true));
+  if (ok) aviso('Login publicado \u2014 j\u00e1 d\u00e1 pra entrar com ele em qualquer computador.', 6000);
+  else aviso('Login criado neste navegador. Ele vai junto no pr\u00f3ximo "Salvar altera\u00e7\u00f5es".', 7000);
+}
 
 function aplicarModoEdicao() {
   document.body.classList.toggle('modo-edicao', S.editando);
@@ -4040,6 +4061,7 @@ function tentarCadastro() {
   salvarAdmins(admins);
   S.editando = true; S.usuarioAtual = login; fecharModalAdmin(); aplicarModoEdicao();
   aviso(`Cadastro realizado. Bem-vindo(a), ${login}.`);
+  publicarListaAdmins();
 }
 function tentarTrocarSenha() {
   limparErrosAdmin();
@@ -4057,6 +4079,7 @@ function tentarTrocarSenha() {
   admins[idx].hash = hashSenha(novaSenha);
   salvarAdmins(admins);
   aviso(`Senha de ${admins[idx].login} trocada. Já pode entrar com a nova senha.`);
+  publicarListaAdmins();
   $('#loginEntrarUsuario').value = admins[idx].login;
   $('#loginEntrarSenha').value = '';
   trocarAbaAdmin('entrar');
