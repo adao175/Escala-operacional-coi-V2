@@ -2178,12 +2178,16 @@
    "n_total": 4
   }
  },
- "idx": 2,
+ "idx": 1,
  "turnosOcultos": [],
  "atualizadoEm": "2026-08-28",
  "atualizadoPor": "alsj6",
  "corManual": {
-  "2026-8|06-14|25|M": "neutro"
+  "2026-8|06-14|25|M": "neutro",
+  "2026-9|10-18|1|N": "he",
+  "2026-9|10-18|1|B": "he",
+  "2026-9|06-14|1|F": "he",
+  "2026-9|14-22|1|M": "he"
  },
  "mesReferencia": {
   "ano": 2026,
