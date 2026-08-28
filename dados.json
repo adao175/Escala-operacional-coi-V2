@@ -592,10 +592,12 @@
  "estadoInicial": null,
  "idx": 0,
  "turnosOcultos": [],
- "atualizadoEm": null,
- "atualizadoHora": null,
- "atualizadoPor": null,
- "corManual": {},
+ "atualizadoEm": "2026-08-28",
+ "atualizadoHora": "15:39",
+ "atualizadoPor": "JPSA8",
+ "corManual": {
+  "2026-8|06-14|4|Q": "assist"
+ },
  "mesReferencia": null,
  "equilibrarFds": false,
  "historico": {
