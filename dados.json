@@ -1,0 +1,645 @@
+{
+ "versao": 1,
+ "ops": [
+  {
+   "letra": "X",
+   "nome": "ADISSON DOS SANTOS OLIVEIRA",
+   "login": "ASO3",
+   "principal": "Lagarto",
+   "secundario": "São Cristóvão",
+   "tipo": "Formado",
+   "aju_especial": "Não",
+   "ausencias": [
+    {
+     "inicio": "2027-01-01",
+     "fim": "2027-02-02",
+     "motivo": "Férias"
+    }
+   ],
+   "sem_madrugada": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 1,
+   "prioridade_polo_secundario": 1
+  },
+  {
+   "letra": "U",
+   "nome": "AISLAN LIMA SANTOS",
+   "login": "ALS11",
+   "principal": "Aracaju - 1",
+   "secundario": "Aracaju - 1",
+   "tipo": "Formado",
+   "aju_especial": "Não",
+   "ausencias": [],
+   "sem_madrugada": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 1,
+   "prioridade_polo_secundario": 1
+  },
+  {
+   "letra": "A",
+   "nome": "ANDRE DE ASSUNCAO SANTOS",
+   "login": "AAS7",
+   "principal": "Itabaiana",
+   "secundario": "Lagarto",
+   "tipo": "Formado",
+   "aju_especial": "Sim",
+   "ausencias": [
+    {
+     "inicio": "2026-03-07",
+     "fim": "2026-04-05",
+     "motivo": "Férias"
+    }
+   ],
+   "sem_madrugada": false,
+   "prioridade_aju": 2,
+   "prioridade_polo_principal": 4,
+   "prioridade_polo_secundario": 3
+  },
+  {
+   "letra": "4",
+   "nome": "ANY CAROLINNE DOS SANTOS MUNIZ",
+   "login": "ACSM13",
+   "principal": "São Cristóvão",
+   "secundario": "Aracaju - 2",
+   "tipo": "Formado",
+   "aju_especial": "Não",
+   "ausencias": [
+    {
+     "inicio": "2026-11-01",
+     "fim": "2026-11-30",
+     "motivo": "Férias"
+    }
+   ],
+   "sem_madrugada": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 4,
+   "prioridade_polo_secundario": 1
+  },
+  {
+   "letra": "B",
+   "nome": "BRUNO TEIXEIRA DOS SANTOS",
+   "login": "BTS9",
+   "principal": "Maruim",
+   "secundario": "São Cristóvão",
+   "tipo": "Formado",
+   "aju_especial": "Não",
+   "ausencias": [
+    {
+     "inicio": "2026-06-01",
+     "fim": "2026-06-30",
+     "motivo": "Férias"
+    }
+   ],
+   "sem_madrugada": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 3,
+   "prioridade_polo_secundario": 4
+  },
+  {
+   "letra": "C",
+   "nome": "CESAR SANTOS DE CASTRO",
+   "login": "",
+   "principal": "Itabaiana",
+   "secundario": "Lagarto",
+   "tipo": "Formado",
+   "aju_especial": "Sim",
+   "ausencias": [
+    {
+     "inicio": "2027-01-01",
+     "fim": "2027-01-30",
+     "motivo": "Férias"
+    }
+   ],
+   "sem_madrugada": false,
+   "prioridade_aju": 3,
+   "prioridade_polo_principal": 1,
+   "prioridade_polo_secundario": 2
+  },
+  {
+   "letra": "8",
+   "nome": "CHRISTYAN KENNEDDI LIMA SOUZA",
+   "principal": "MPS",
+   "secundario": "MPS",
+   "tipo": "MPS",
+   "aju_especial": "Não",
+   "ausencias": [],
+   "login": "",
+   "sem_madrugada": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 1,
+   "prioridade_polo_secundario": 2
+  },
+  {
+   "letra": "D",
+   "nome": "DENER RODRIGUES ARAUJO",
+   "principal": "Propriá",
+   "secundario": "Dores",
+   "tipo": "Formado",
+   "aju_especial": "Não",
+   "ausencias": [
+    {
+     "inicio": "2026-12-01",
+     "fim": "2026-12-30",
+     "motivo": "Férias"
+    }
+   ],
+   "login": "",
+   "sem_madrugada": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 2,
+   "prioridade_polo_secundario": 4
+  },
+  {
+   "letra": "E",
+   "nome": "EANISSON DE FRANCA VIEIRA",
+   "login": "",
+   "principal": "Aracaju - 1",
+   "secundario": "Itabaiana",
+   "tipo": "Formado",
+   "aju_especial": "Não",
+   "ausencias": [
+    {
+     "inicio": "2026-09-01",
+     "fim": "2026-09-30",
+     "motivo": "Férias"
+    }
+   ],
+   "sem_madrugada": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 2,
+   "prioridade_polo_secundario": 4
+  },
+  {
+   "letra": "H",
+   "nome": "ERIC DOS ANJOS SANTOS",
+   "login": "",
+   "principal": "Lagarto",
+   "secundario": "Propriá",
+   "tipo": "Formado",
+   "aju_especial": "Não",
+   "ausencias": [
+    {
+     "inicio": "2026-05-10",
+     "fim": "2026-06-09",
+     "motivo": "Férias"
+    }
+   ],
+   "sem_madrugada": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 3,
+   "prioridade_polo_secundario": 4
+  },
+  {
+   "letra": "F",
+   "nome": "FABIO DE ALMEIDA ARAUJO",
+   "login": "",
+   "principal": "Lagarto",
+   "secundario": "Propriá",
+   "tipo": "Formado",
+   "aju_especial": "Não",
+   "ausencias": [
+    {
+     "inicio": "2026-05-08",
+     "fim": "2026-06-06",
+     "motivo": "Férias"
+    }
+   ],
+   "sem_madrugada": true,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 4,
+   "prioridade_polo_secundario": 7
+  },
+  {
+   "letra": "Y",
+   "nome": "JANIELE IASMIN DA SILVA SANTOS",
+   "login": "",
+   "principal": "MPS",
+   "secundario": "Propriá",
+   "tipo": "Formado",
+   "aju_especial": "Não",
+   "ausencias": [],
+   "sem_madrugada": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 2,
+   "prioridade_polo_secundario": 1
+  },
+  {
+   "letra": "Z",
+   "nome": "JANISON OLIVEIRA MACEDO COSTA",
+   "login": "",
+   "principal": "São Cristóvão",
+   "secundario": "Lagarto",
+   "tipo": "Formado",
+   "aju_especial": "Sim",
+   "ausencias": [],
+   "sem_madrugada": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 2,
+   "prioridade_polo_secundario": 4
+  },
+  {
+   "letra": "$",
+   "nome": "JOÃO BENTO MENEZES SANTOS",
+   "login": "",
+   "principal": "Aracaju - 2",
+   "secundario": "Propriá",
+   "tipo": "Formado",
+   "aju_especial": "Não",
+   "ausencias": [
+    {
+     "inicio": "2026-04-06",
+     "fim": "2026-04-30",
+     "motivo": "Férias"
+    },
+    {
+     "inicio": "2026-05-01",
+     "fim": "2026-05-05",
+     "motivo": "Férias"
+    }
+   ],
+   "sem_madrugada": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 2,
+   "prioridade_polo_secundario": 2
+  },
+  {
+   "letra": "J",
+   "nome": "JOAO PAULO SANTANA OLIVEIRA",
+   "login": "",
+   "principal": "Aracaju - 2",
+   "secundario": "Propriá",
+   "tipo": "Formado",
+   "aju_especial": "Sim",
+   "ausencias": [
+    {
+     "inicio": "2026-05-04",
+     "fim": "2026-06-03",
+     "motivo": "Férias"
+    }
+   ],
+   "sem_madrugada": false,
+   "prioridade_aju": 0,
+   "prioridade_polo_principal": 4,
+   "prioridade_polo_secundario": 6
+  },
+  {
+   "letra": "K",
+   "nome": "JOSE CRISTIAN DA COSTA SANTOS",
+   "principal": "Dores",
+   "secundario": "Itabaiana",
+   "tipo": "Formado",
+   "aju_especial": "Sim",
+   "ausencias": [
+    {
+     "inicio": "2026-12-01",
+     "fim": "2026-12-30",
+     "motivo": "Férias"
+    }
+   ],
+   "login": "",
+   "sem_madrugada": false,
+   "prioridade_aju": 6,
+   "prioridade_polo_principal": 4,
+   "prioridade_polo_secundario": 3
+  },
+  {
+   "letra": "M",
+   "nome": "JOSE MICHAEL DE ANDRADE VENTURA",
+   "principal": "Maruim",
+   "secundario": "Propriá",
+   "tipo": "Formado",
+   "aju_especial": "Não",
+   "ausencias": [
+    {
+     "inicio": "2026-10-01",
+     "fim": "2026-10-30",
+     "motivo": "Férias"
+    }
+   ],
+   "login": "",
+   "sem_madrugada": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 4,
+   "prioridade_polo_secundario": 3
+  },
+  {
+   "letra": "W",
+   "nome": "JOSIMAR SOUZA OLIVEIRA",
+   "principal": "Propriá",
+   "secundario": "Dores",
+   "tipo": "Formado",
+   "aju_especial": "Não",
+   "ausencias": [
+    {
+     "inicio": "2026-06-01",
+     "fim": "2026-06-30",
+     "motivo": "Férias"
+    }
+   ],
+   "login": "",
+   "sem_madrugada": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 3,
+   "prioridade_polo_secundario": 2
+  },
+  {
+   "letra": "#",
+   "nome": "KLEVERTH GONZAGA DOS SANTOS",
+   "principal": "Propriá",
+   "secundario": "Lagarto",
+   "tipo": "Formado",
+   "aju_especial": "Não",
+   "ausencias": [
+    {
+     "inicio": "2026-08-01",
+     "fim": "2026-08-30",
+     "motivo": "Férias"
+    }
+   ],
+   "login": "",
+   "sem_madrugada": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 1,
+   "prioridade_polo_secundario": 1
+  },
+  {
+   "letra": "2",
+   "nome": "LUCAS FERREIRA DA SILVA SANTOS",
+   "login": "LFSS3",
+   "principal": "São Cristóvão",
+   "secundario": "Aracaju - 2",
+   "tipo": "Formado",
+   "aju_especial": "Não",
+   "ausencias": [
+    {
+     "inicio": "2026-04-01",
+     "fim": "2026-04-20",
+     "motivo": "Férias"
+    }
+   ],
+   "sem_madrugada": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 1,
+   "prioridade_polo_secundario": 3
+  },
+  {
+   "letra": "V",
+   "nome": "MARLON SANTOS BARBOSA",
+   "principal": "Maruim",
+   "secundario": "Propriá",
+   "tipo": "Formado",
+   "aju_especial": "Não",
+   "ausencias": [
+    {
+     "inicio": "2026-07-15",
+     "fim": "2026-08-14",
+     "motivo": "Férias"
+    }
+   ],
+   "login": "",
+   "sem_madrugada": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 2,
+   "prioridade_polo_secundario": 5
+  },
+  {
+   "letra": "N",
+   "nome": "NEILSON SANTOS RIBEIRO DA GRACA",
+   "login": "",
+   "principal": "Itabaiana",
+   "secundario": "Dores",
+   "tipo": "Formado",
+   "aju_especial": "Sim",
+   "ausencias": [
+    {
+     "inicio": "2027-01-01",
+     "fim": "2027-01-30",
+     "motivo": "Férias"
+    }
+   ],
+   "sem_madrugada": false,
+   "prioridade_aju": 4,
+   "prioridade_polo_principal": 3,
+   "prioridade_polo_secundario": 3
+  },
+  {
+   "letra": "P",
+   "nome": "PAULO ROBERTO BARROS DA SILVA",
+   "login": "",
+   "principal": "Maruim",
+   "secundario": "Aracaju - 2",
+   "tipo": "Formado",
+   "aju_especial": "Não",
+   "ausencias": [],
+   "sem_madrugada": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 1,
+   "prioridade_polo_secundario": 2
+  },
+  {
+   "letra": "&",
+   "nome": "RAFAEL ALVES DA SILVA",
+   "login": "",
+   "principal": "Lagarto",
+   "secundario": "Itabaiana",
+   "tipo": "Formado",
+   "aju_especial": "Não",
+   "ausencias": [
+    {
+     "inicio": "2026-03-01",
+     "fim": "2026-03-23",
+     "motivo": "Férias"
+    }
+   ],
+   "sem_madrugada": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 2,
+   "prioridade_polo_secundario": 1
+  },
+  {
+   "letra": "R",
+   "nome": "REGIVAN DOS SANTOS ANDRADE",
+   "login": "",
+   "principal": "Dores",
+   "secundario": "Itabaiana",
+   "tipo": "Formado",
+   "aju_especial": "Sim",
+   "ausencias": [],
+   "sem_madrugada": false,
+   "prioridade_aju": 7,
+   "prioridade_polo_principal": 1,
+   "prioridade_polo_secundario": 2
+  },
+  {
+   "letra": "6",
+   "nome": "ROBERTA CRISTINA DE OLIVEIRA",
+   "principal": "MPS",
+   "secundario": "MPS",
+   "tipo": "MPS",
+   "aju_especial": "Não",
+   "ausencias": [],
+   "login": "",
+   "sem_madrugada": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 3,
+   "prioridade_polo_secundario": 1
+  },
+  {
+   "letra": "Q",
+   "nome": "RONIQUER CAMILO DOS SANTOS",
+   "principal": "Itabaiana",
+   "secundario": "Dores",
+   "tipo": "Formado",
+   "aju_especial": "Sim",
+   "ausencias": [
+    {
+     "inicio": "2026-10-01",
+     "fim": "2026-10-30",
+     "motivo": "Férias"
+    }
+   ],
+   "login": "",
+   "sem_madrugada": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 2,
+   "prioridade_polo_secundario": 1
+  },
+  {
+   "letra": "O",
+   "nome": "RUBENS DE ANDRADE GOMES",
+   "login": "",
+   "principal": "Dores",
+   "secundario": "Itabaiana",
+   "tipo": "Formado",
+   "aju_especial": "Sim",
+   "ausencias": [
+    {
+     "inicio": "2026-03-07",
+     "fim": "2026-03-26",
+     "motivo": "Férias"
+    }
+   ],
+   "sem_madrugada": false,
+   "prioridade_aju": 5,
+   "prioridade_polo_principal": 2,
+   "prioridade_polo_secundario": 5
+  },
+  {
+   "letra": "7",
+   "nome": "SERGIO DIAS DOS SANTOAS FILHO",
+   "login": "SDSF",
+   "principal": "Aracaju - 2",
+   "secundario": "São Cristóvão",
+   "tipo": "Assistido",
+   "aju_especial": "Não",
+   "ausencias": [
+    {
+     "inicio": "2026-10-01",
+     "fim": "2026-10-30",
+     "motivo": "Férias"
+    }
+   ],
+   "sem_madrugada": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 3,
+   "prioridade_polo_secundario": 3
+  },
+  {
+   "letra": "I",
+   "nome": "THAYS ERNESTO DE FARIAS",
+   "login": "",
+   "principal": "Dores",
+   "secundario": "Maruim",
+   "tipo": "Formado",
+   "aju_especial": "Não",
+   "ausencias": [
+    {
+     "inicio": "2026-11-01",
+     "fim": "2026-11-30",
+     "motivo": "Férias"
+    }
+   ],
+   "sem_madrugada": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 3,
+   "prioridade_polo_secundario": 1
+  },
+  {
+   "letra": "T",
+   "nome": "THIAGO DOS SANTOS ARAUJO",
+   "login": "",
+   "principal": "Aracaju - 2",
+   "secundario": "São Cristóvão",
+   "tipo": "Formado",
+   "aju_especial": "Sim",
+   "ausencias": [
+    {
+     "inicio": "2026-07-01",
+     "fim": "2026-07-30",
+     "motivo": "Férias"
+    }
+   ],
+   "sem_madrugada": false,
+   "prioridade_aju": 1,
+   "prioridade_polo_principal": 1,
+   "prioridade_polo_secundario": 2
+  },
+  {
+   "letra": "9",
+   "nome": "ADU ALEXANDRE BATISTA DOS SANTOS",
+   "login": "",
+   "principal": "São Cristóvão",
+   "secundario": "Aracaju - 3",
+   "tipo": "Assistido",
+   "aju_especial": "Não",
+   "ausencias": [
+    {
+     "inicio": "2026-08-01",
+     "fim": "2026-09-30",
+     "motivo": "Treinamento"
+    }
+   ],
+   "sem_madrugada": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 3,
+   "prioridade_polo_secundario": 1
+  },
+  {
+   "letra": "S",
+   "nome": "SIDNEY FARIAS DE ANDRADE",
+   "login": "",
+   "principal": "Propriá",
+   "secundario": "Maruim",
+   "tipo": "Formado",
+   "aju_especial": "Não",
+   "ausencias": [
+    {
+     "inicio": "2026-10-03",
+     "fim": "2026-11-02",
+     "motivo": "Férias"
+    }
+   ],
+   "sem_madrugada": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 4,
+   "prioridade_polo_secundario": 2
+  }
+ ],
+ "metaM": 8,
+ "metaT": 8,
+ "metaN": 3,
+ "minDiurno": 6,
+ "mesIni": null,
+ "nMeses": 6,
+ "compactaFolga": false,
+ "manual": {},
+ "estadoInicial": null,
+ "idx": 0,
+ "turnosOcultos": [],
+ "atualizadoEm": null,
+ "atualizadoPor": null,
+ "corManual": {},
+ "mesReferencia": null,
+ "equilibrarFds": false,
+ "historico": {}
+}
