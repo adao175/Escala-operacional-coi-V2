@@ -3496,7 +3496,12 @@ function inferirEstadosDeEscala(dados, ops) {
     }
     let nTotal = 0;
     Object.values((dados.escala['22-06'] || {})).forEach(arr => { if ((arr || []).indexOf(l) >= 0) nTotal++; });
-    estados[l] = { ciclo: ini, ultimo_turno: ultimoTurno, n_total: nTotal };
+    // 'ini' foi calculado relativo ao dia 1 DESTE mês (o de referência). Como
+    // esse estado vira o ponto de partida do mês SEGUINTE, precisa avançar
+    // 'dias' posições no ciclo — a mesma conta que o gerador normal já faz
+    // entre um mês gerado e o próximo (ciclo + dias). Sem isso, o rodízio
+    // pulava/repetia dias na virada do mês de referência pro mês seguinte.
+    estados[l] = { ciclo: (ini + dias) % 9, ultimo_turno: ultimoTurno, n_total: nTotal };
   });
   return estados;
 }
