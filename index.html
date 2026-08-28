@@ -296,6 +296,15 @@ table.lista .cx{width:auto;min-width:0}
 .paleta-cores .cor-limpar{padding:4px 9px;font-size:11px;border:1px solid var(--line);border-radius:20px;background:var(--surface);cursor:pointer;color:var(--ink-2);white-space:nowrap}
 .paleta-cores .cor-limpar:hover{background:var(--azul-2);border-color:var(--azul)}
 .paleta-dica{font-size:10px;color:var(--ink-3);white-space:nowrap}
+.paleta-sep{width:1px;height:20px;background:var(--line-2);margin:0 2px;flex:0 0 auto}
+.opcao-ciclo{display:flex;align-items:center;gap:6px;height:34px;font-size:13px;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+.opcao-ciclo input{cursor:pointer}
+tr.inicio-grupo-ciclo > td{border-top:2px solid var(--ink-3) !important}
+.op-ciclo{font-weight:700;color:var(--azul)}
+.paleta-cores .bt-hist{width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;flex:0 0 auto}
+.paleta-cores .bt-hist svg{width:15px;height:15px}
+.paleta-cores .bt-hist:hover:not(:disabled){background:var(--azul-2);border-color:var(--azul);color:var(--azul)}
+.paleta-cores .bt-hist:disabled{opacity:.35;cursor:default}
 @media(max-width:900px){.paleta-cores{display:none !important}}
 
 .letra.selecionada-cor{outline:2px dashed var(--azul);outline-offset:1px;border-radius:3px}
@@ -390,8 +399,8 @@ body.foco-ativo{overflow:hidden}
 
 <nav class="abas" id="abas">
   <div class="abas-tabs">
-    <button class="aba ativa" data-alvo="p-escala">Escala</button>
-    <button class="aba" data-alvo="p-operador">Por operador</button>
+    <button class="aba ativa" data-alvo="p-escala">Visão global</button>
+    <button class="aba" data-alvo="p-operador">Visão por turno</button>
     <button class="aba" data-alvo="p-info">Informações</button>
     <button class="aba esconde" id="abaPainel" data-alvo="p-painel">Painel</button>
   </div>
@@ -404,6 +413,13 @@ body.foco-ativo{overflow:hidden}
     <button class="cor-btn" data-cor="outros" style="background:#e67e22" title="Laranja — Outros">OUT</button>
     <button class="cor-limpar" data-cor="" title="Remover cor manual">✕ Sem cor</button>
     <span class="paleta-dica">← clique numa letra 1º</span>
+    <span class="paleta-sep"></span>
+    <button class="bt-hist" id="btDesfazer" type="button" disabled title="Desfazer último passo (Ctrl+Z)" aria-label="Desfazer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
+    </button>
+    <button class="bt-hist" id="btRefazer" type="button" disabled title="Refazer passo desfeito (Ctrl+Y)" aria-label="Refazer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg>
+    </button>
   </div>
   <div></div>
 </nav>
@@ -437,12 +453,12 @@ body.foco-ativo{overflow:hidden}
       <div class="rolagem"><table class="grade" id="tabelaEscala"></table></div>
     </div>
   </div>
-  <p class="dica nao-imprime" style="margin-top:-6px;font-size:11px">
+  <p class="dica nao-imprime" style="margin-top:-6px;font-size:10px;line-height:1.35;display:flex;align-items:center;gap:8px;flex-wrap:nowrap">
     <span id="dicaEscalaVisual">Você está no modo de visualização. Clique em <b>Editar escala</b> no topo para alterar a grade.</span>
-    <span id="dicaEscalaEdicao" class="esconde">Clique duas vezes numa célula para editar as letras daquele turno no dia (a letra sai automaticamente
+    <span id="dicaEscalaEdicao" class="esconde" style="flex:1 1 auto;min-width:0">Clique duas vezes numa célula para editar as letras daquele turno no dia (a letra sai automaticamente
     dos outros turnos do mesmo dia). Um clique numa letra a seleciona para pintar com a paleta de cores no topo.
     Botão direito numa letra lança uma ausência para aquele operador naquele dia — a letra sai do turno e vai para a linha da ausência.</span>
-    <button class="bt perigo esconde" id="btRestaurarBackup" style="padding:3px 9px;font-size:12px" title="Volta tudo para o estado de quando você clicou em 'Salvar arquivo' pela última vez">Restaurar última versão salva</button>
+    <button class="bt perigo esconde" id="btRestaurarBackup" style="padding:2px 8px;font-size:10px;white-space:nowrap;flex:0 0 auto" title="Volta tudo para o estado de quando você clicou em 'Salvar arquivo' pela última vez">Restaurar última versão salva</button>
   </p>
 </section>
 
@@ -456,6 +472,10 @@ body.foco-ativo{overflow:hidden}
           <select id="fPolo" style="min-width:170px"></select></div>
         <div class="campo"><label for="fBusca">Buscar operador</label>
           <input id="fBusca" placeholder="nome ou letra" style="min-width:200px"></div>
+        <div class="campo"><label for="fMesmaLetra">Ordenação</label>
+          <label class="opcao-ciclo" title="Agrupa quem começa o ciclo 6x3 no mesmo dia, em vez da ordem alfabética">
+            <input type="checkbox" id="fMesmaLetra"> Mesma letra
+          </label></div>
       </div>
     </div>
   </div>
@@ -1502,10 +1522,12 @@ const S = {
   manual: {},         // "ano-mes|turno|dia" -> [letras]
   estadoInicial: null,
   polo: "Todos", busca: "", compactaFolga: false,
+  agruparCiclo: false,        // "Mesma letra": ordena a visão por operador pelo início do ciclo 6x3
   editando: false,
   turnosOcultos: new Set(),   // turnos escondidos da grade (filtro "Turnos exibidos")
   usuarioAtual: null,         // login do admin autenticado nesta sessão
   atualizadoEm: null,         // data ISO da última atualização salva
+  atualizadoHora: null,       // hora HH:MM da última atualização salva
   atualizadoPor: null,        // login de quem fez a última atualização
   corManual: {},               // "ano-mes|turno|dia|letra" -> 'aju'|'assist'|'he'|'permuta'|'outros'
   mesReferencia: null,         // mês carregado de um arquivo externo (formato callback), usado como aba fixa + ponto de partida
@@ -1544,12 +1566,15 @@ function proximoMes(a, m) { return m === 12 ? [a + 1, 1] : [a, m + 1]; }
 function atualizarCarimbo() {
   const el2 = $('#marcaAtualizado'); if (!el2) return;
   const dataTxt = S.atualizadoEm ? br(S.atualizadoEm) : '—';
+  const horaTxt = (S.atualizadoEm && S.atualizadoHora) ? ` às ${S.atualizadoHora}` : '';
   const porTxt = S.atualizadoPor ? ` por ${S.atualizadoPor}` : '';
-  el2.textContent = `Atualizado em: ${dataTxt}${porTxt}`;
+  el2.textContent = `Atualizado em: ${dataTxt}${horaTxt}${porTxt}`;
 }
 function carimbarAtualizacao() {
   if (!S.editando || !S.usuarioAtual) return;
-  S.atualizadoEm = paraIso(new Date());
+  const agora = new Date();
+  S.atualizadoEm = paraIso(agora);
+  S.atualizadoHora = String(agora.getHours()).padStart(2, '0') + ':' + String(agora.getMinutes()).padStart(2, '0');
   S.atualizadoPor = S.usuarioAtual;
   atualizarCarimbo();
 }
@@ -2515,6 +2540,29 @@ function nomeDe(letra) {
 }
 
 /* ═══════════════ visão por operador ═══════════════ */
+/* ═══════════════ "Mesma letra": ordenar pelo início do ciclo 6x3 ═══════════════
+   Descobre em que dia o operador retoma o trabalho depois de uma folga. Dias de
+   ausência (férias, atestado, treinamento...) são ignorados: eles mascaram o dia
+   mas não deslocam o ciclo por baixo. O dia encontrado é normalizado no ciclo de
+   9 dias, então quem roda no mesmo ritmo cai sempre no mesmo grupo, mesmo que a
+   primeira virada apareça em dias diferentes do mês. */
+function fasedoCiclo(res, letra, dias) {
+  const TRAB = new Set(TURNOS_TRABALHO);
+  const status = new Array(dias + 1);
+  for (let d = 1; d <= dias; d++) {
+    const t = turnoDe(res, letra, d);
+    status[d] = t ? (TRAB.has(t) ? 'T' : 'A') : ((res.escala['FOLGA'] || {})[d] || []).indexOf(letra) >= 0 ? 'F' : 'A';
+  }
+  for (let d = 2; d <= dias; d++) {
+    if (status[d] !== 'T') continue;
+    let ant = d - 1;
+    while (ant >= 1 && status[ant] === 'A') ant--;   // pula dias mascarados por ausência
+    if (ant >= 1 && status[ant] === 'F') return { fase: ((d - 1) % 9) + 1, dia: d };
+  }
+  // quem nunca vira de folga pra trabalho no mês (férias o mês inteiro, por ex.)
+  return { fase: 99, dia: 99 };
+}
+
 function desenharOperador() {
   const res = mesAtual();
   const t = $('#tabelaOperador'); t.innerHTML = '';
@@ -2525,7 +2573,14 @@ function desenharOperador() {
   const busca = (S.busca || '').trim().toUpperCase();
   let lista = S.ops.filter(o => S.polo === 'Todos' || polo(o) === S.polo);
   if (busca) lista = lista.filter(o => o.nome.toUpperCase().indexOf(busca) >= 0 || o.letra === busca);
-  lista = lista.slice().sort((a, b) => a.nome.localeCompare(b.nome));
+  const fases = {};
+  if (S.agruparCiclo) {
+    lista.forEach(o => { fases[o.letra] = fasedoCiclo(res, o.letra, dias); });
+    lista = lista.slice().sort((a, b) =>
+      (fases[a.letra].fase - fases[b.letra].fase) || a.nome.localeCompare(b.nome));
+  } else {
+    lista = lista.slice().sort((a, b) => a.nome.localeCompare(b.nome));
+  }
 
   const thead = el('thead'), tr1 = el('tr');
   tr1.appendChild(el('th', { class: 'col-op', text: 'Operador' }));
@@ -2539,18 +2594,30 @@ function desenharOperador() {
   thead.appendChild(tr1); t.appendChild(thead);
 
   const tbody = el('tbody');
+  let faseAnterior = null;
   for (const o of lista) {
     const tr = el('tr');
+    const info = S.agruparCiclo ? fases[o.letra] : null;
+    if (info) {
+      if (faseAnterior !== null && info.fase !== faseAnterior) tr.classList.add('inicio-grupo-ciclo');
+      faseAnterior = info.fase;
+    }
     const tdN = el('td', { class: 'col-op' });
     const n1 = el('span', { class: 'op-nome' });
     n1.appendChild(el('span', { class: 'selo-letra', text: o.letra }));
     n1.appendChild(document.createTextNode(o.nome));
     tdN.appendChild(n1);
-    tdN.appendChild(el('span', {
-      class: 'op-sub',
-      text: [o.tipo, o.aju_especial === 'Sim' ? 'AJU especial' : '', o.sem_madrugada ? 'sem madrugada' : '']
-        .filter(Boolean).join(' · ')
-    }));
+    const legendas = [o.tipo, o.aju_especial === 'Sim' ? 'AJU especial' : '', o.sem_madrugada ? 'sem madrugada' : ''].filter(Boolean);
+    const sub = el('span', { class: 'op-sub', text: legendas.join(' · ') });
+    if (info) {
+      sub.appendChild(document.createTextNode(legendas.length ? ' · ' : ''));
+      sub.appendChild(el('span', {
+        class: 'op-ciclo',
+        text: info.fase === 99 ? 'sem ciclo no mês' : 'inicia dia ' + info.dia,
+        title: info.fase === 99 ? 'Não há virada de folga para trabalho neste mês' : 'Primeiro dia de trabalho depois de uma folga'
+      }));
+    }
+    tdN.appendChild(sub);
     tr.appendChild(tdN);
 
     for (let d = 1; d <= dias; d++) {
@@ -2714,7 +2781,7 @@ function desenharAusencias() {
     const tdX = el('td');
     if (S.editando) {
       const bx = el('button', { class: 'bt perigo', style: 'padding:2px 8px;font-size:11px', text: 'remover' });
-      bx.onclick = () => { o.ausencias.splice(i, 1); desenharAusencias(); desenharCadastro(); gerarTudo(); carimbarAtualizacao(); };
+      bx.onclick = () => { registrarPasso(); o.ausencias.splice(i, 1); desenharAusencias(); desenharCadastro(); gerarTudo(); carimbarAtualizacao(); };
       tdX.appendChild(bx);
     }
     tr.appendChild(tdX);
@@ -3228,6 +3295,62 @@ async function exportarRelatorioPDF() {
 }
 
 /* ═══════════════ edição inline da célula (estilo planilha) ═══════════════ */
+/* ═══════════════ desfazer / refazer (histórico de edição) ═══════════════
+   Guarda fotos do estado editável antes de cada passo. Só vale para a sessão
+   de edição atual — sair da edição ou carregar outro projeto zera as pilhas. */
+const CAMPOS_HISTORICO = ['ops', 'meses', 'historico', 'manual', 'corManual', 'estadoInicial', 'mesReferencia'];
+const LIMITE_HISTORICO = 60;
+let pilhaDesfazer = [], pilhaRefazer = [];
+
+function fotoEstado() {
+  const f = {};
+  CAMPOS_HISTORICO.forEach(k => { f[k] = clonar(S[k]); });
+  return f;
+}
+function aplicarFoto(f) {
+  CAMPOS_HISTORICO.forEach(k => { if (k in f) S[k] = clonar(f[k]); });
+  if (S.idx >= S.meses.length) S.idx = Math.max(0, S.meses.length - 1);
+  selecionarSpanCor(null);
+  desenharEscala(); desenharOperador(); desenharCadastro(); desenharAusencias(); desenharPainel();
+  carimbarAtualizacao();
+  atualizarBotoesHistorico();
+}
+// chamar SEMPRE antes de alterar a escala
+function registrarPasso() {
+  pilhaDesfazer.push(fotoEstado());
+  if (pilhaDesfazer.length > LIMITE_HISTORICO) pilhaDesfazer.shift();
+  pilhaRefazer.length = 0;
+  atualizarBotoesHistorico();
+}
+function limparHistoricoEdicao() {
+  pilhaDesfazer.length = 0; pilhaRefazer.length = 0;
+  atualizarBotoesHistorico();
+}
+function atualizarBotoesHistorico() {
+  const bd = $('#btDesfazer'), br = $('#btRefazer');
+  if (!bd || !br) return;
+  bd.disabled = !pilhaDesfazer.length;
+  br.disabled = !pilhaRefazer.length;
+  bd.title = pilhaDesfazer.length ? `Desfazer último passo (Ctrl+Z) — ${pilhaDesfazer.length} disponível(is)` : 'Nada para desfazer';
+  br.title = pilhaRefazer.length ? `Refazer passo desfeito (Ctrl+Y) — ${pilhaRefazer.length} disponível(is)` : 'Nada para refazer';
+}
+function desfazerPasso() {
+  if (!S.editando) return;
+  if (!pilhaDesfazer.length) { aviso('Não há mais nada para desfazer.'); return; }
+  pilhaRefazer.push(fotoEstado());
+  if (pilhaRefazer.length > LIMITE_HISTORICO) pilhaRefazer.shift();
+  aplicarFoto(pilhaDesfazer.pop());
+  aviso('Passo desfeito.');
+}
+function refazerPasso() {
+  if (!S.editando) return;
+  if (!pilhaRefazer.length) { aviso('Não há nada para refazer.'); return; }
+  pilhaDesfazer.push(fotoEstado());
+  if (pilhaDesfazer.length > LIMITE_HISTORICO) pilhaDesfazer.shift();
+  aplicarFoto(pilhaRefazer.pop());
+  aviso('Passo refeito.');
+}
+
 function iniciarEdicaoInline(celEl) {
   if (celEl.querySelector('textarea')) return;
   const turno = celEl.dataset.turno, ano = Number(celEl.dataset.ano),
@@ -3262,6 +3385,8 @@ function iniciarEdicaoInline(celEl) {
     const novas = ta.value.toUpperCase().split(/[\n,;\s]+/).map(s => s.trim()).filter(Boolean);
     const validas = new Set(S.ops.map(o => o.letra));
     const desconhecidas = novas.filter(l => !validas.has(l));
+    const houveMudanca = novas.join('|') !== letrasAtuais.join('|');
+    if (houveMudanca) registrarPasso();
 
     // quem já estava de folga no dia continua na folga — não some automaticamente.
     // Se essa mesma letra também entrar num turno de trabalho, ela é marcada como
@@ -3323,6 +3448,7 @@ function aplicarCorManual(cor) {
   if (!spanCorSelecionado) { aviso('Clique primeiro numa letra da escala para selecioná-la.'); return; }
   const chave = spanCorSelecionado.dataset.corKey;
   const corFinal = cor || 'neutro';
+  if (S.corManual[chave] !== corFinal) registrarPasso();
   S.corManual[chave] = corFinal;
   spanCorSelecionado.className = spanCorSelecionado.className
     .replace(/\bman-\w+\b/g, '').replace(/\bassist\b/g, '').replace(/\baju\b/g, '').replace(/\bot\b/g, '')
@@ -3408,7 +3534,7 @@ function dadosDoProjeto() {
     versao: 1, ops: S.ops, metaM: S.metaM, metaT: S.metaT, metaN: S.metaN,
     minDiurno: S.minDiurno, mesIni: S.mesIni, nMeses: S.nMeses, compactaFolga: S.compactaFolga,
     manual: S.manual, estadoInicial: S.estadoInicial, idx: S.idx, turnosOcultos: Array.from(S.turnosOcultos),
-    atualizadoEm: S.atualizadoEm, atualizadoPor: S.atualizadoPor, corManual: S.corManual,
+    atualizadoEm: S.atualizadoEm, atualizadoHora: S.atualizadoHora, atualizadoPor: S.atualizadoPor, corManual: S.corManual,
     mesReferencia: S.mesReferencia, equilibrarFds: S.equilibrarFds, historico: S.historico,
     admins: carregarAdmins()
   };
@@ -3506,6 +3632,7 @@ function inferirEstadosDeEscala(dados, ops) {
   return estados;
 }
 function carregarProjeto(d) {
+  limparHistoricoEdicao();
   S.ops = (d.ops || S.ops).map(normalizarOp);
   S.metaM = d.metaM ?? 8; S.metaT = d.metaT ?? 8; S.metaN = d.metaN ?? 3;
   S.minDiurno = d.minDiurno ?? 6; S.mesIni = d.mesIni || S.mesIni; S.compactaFolga = !!d.compactaFolga;
@@ -3513,6 +3640,7 @@ function carregarProjeto(d) {
   S.estadoInicial = d.estadoInicial || null; S.idx = d.idx || 0;
   S.turnosOcultos = new Set(d.turnosOcultos || []);
   S.atualizadoEm = d.atualizadoEm || S.atualizadoEm; S.atualizadoPor = d.atualizadoPor || S.atualizadoPor;
+  S.atualizadoHora = d.atualizadoHora || null;
   S.corManual = d.corManual || {};
   S.mesReferencia = d.mesReferencia || null;
   S.equilibrarFds = !!d.equilibrarFds;
@@ -3905,6 +4033,7 @@ function sincronizar() {
   $('#fMetaM').value = S.metaM; $('#fMetaT').value = S.metaT;
   $('#fMetaN').value = S.metaN; $('#fMinDiurno').value = S.minDiurno;
   $('#fEquilibrarFds').checked = S.equilibrarFds;
+  $('#fMesmaLetra').checked = S.agruparCiclo;
   montarFiltroTurnos();
   montarSelectContinuar();
   atualizarCarimbo();
@@ -3979,6 +4108,7 @@ async function publicarListaAdmins() {
 }
 
 function aplicarModoEdicao() {
+  limparHistoricoEdicao();
   document.body.classList.toggle('modo-edicao', S.editando);
   $('#grupoAcoesEdicao').classList.toggle('esconde', !S.editando);
   $('#btAbrirEdicao').classList.toggle('esconde', S.editando);
@@ -4171,6 +4301,7 @@ $('#btConfirmarApagar').onclick = () => {
   aviso(`${marcados.length} mês(es) apagado(s).`);
 };
 $('#btGerarConfirma').onclick = () => {
+  registrarPasso();
   const radioAtivo = document.querySelector('input[name="modoGeracao"]:checked');
   const modo = radioAtivo ? radioAtivo.value : '';
   if (modo === 'continuar') {
@@ -4216,7 +4347,10 @@ $('#fEquilibrarFds').onchange = e => { S.equilibrarFds = e.target.checked; };
 });
 $('#fPolo').onchange = e => { S.polo = e.target.value; desenharOperador(); };
 $('#fBusca').oninput = e => { S.busca = e.target.value; desenharOperador(); };
+$('#fMesmaLetra').onchange = e => { S.agruparCiclo = e.target.checked; desenharOperador(); };
 $('#btRestaurarBackup').onclick = restaurarBackup;
+$('#btDesfazer').onclick = e => { e.stopPropagation(); desfazerPasso(); };
+$('#btRefazer').onclick = e => { e.stopPropagation(); refazerPasso(); };
 $('#btExcel').onclick = () => { fecharMenuTools(); exportarExcel(); };
 $('#btImprimir').onclick = () => { fecharMenuTools(); window.print(); };
 $('#btAbrir').onclick = () => { fecharMenuTools(); $('#arquivoJson').click(); };
@@ -4344,6 +4478,7 @@ $('#ausSalvar').onclick = () => {
   const ini = $('#ausIni').value, fim = $('#ausFim').value;
   if (!op || !ini || !fim) { aviso('Escolha o operador e as duas datas.'); return; }
   if (fim < ini) { aviso('A data final não pode ser anterior à inicial.'); return; }
+  registrarPasso();
   op.ausencias.push({ inicio: ini, fim, motivo: $('#ausMotivo').value });
   fecharAus();
   desenharAusencias(); desenharCadastro(); gerarTudo(); carimbarAtualizacao();
@@ -4390,6 +4525,16 @@ document.addEventListener('click', e => {
   if (!e.target.closest('#filtroTurnos')) $('#painelFiltroTurnos').classList.add('esconde');
 });
 document.addEventListener('keydown', e => {
+  // Ctrl+Z desfaz, Ctrl+Y (ou Ctrl+Shift+Z) refaz — só no modo edição e fora de campos de texto
+  if ((e.ctrlKey || e.metaKey) && S.editando) {
+    const alvo = e.target;
+    const digitando = alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' || alvo.isContentEditable);
+    if (!digitando) {
+      const k = e.key.toLowerCase();
+      if (k === 'z' && !e.shiftKey) { e.preventDefault(); desfazerPasso(); return; }
+      if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); refazerPasso(); return; }
+    }
+  }
   if (!$('#modalAdmin').classList.contains('esconde')) {
     if (e.key === 'Escape') { fecharModalAdmin(); return; }
     if (e.key === 'Enter') { e.preventDefault(); $('#loginConfirmar').click(); return; }
