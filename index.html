@@ -298,8 +298,44 @@ table.lista .cx{width:auto;min-width:0}
 .paleta-dica{font-size:10px;color:var(--ink-3);white-space:nowrap}
 .paleta-sep{width:1px;height:20px;background:var(--line-2);margin:0 2px;flex:0 0 auto}
 .opcao-ciclo{display:flex;align-items:center;gap:6px;height:34px;font-size:13px;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+/* sinalização de alterações não salvas */
+#marcaPendente{display:inline-flex;align-items:center;gap:5px;margin-left:8px;font-size:11px;
+  color:#f5a09b;font-weight:600}
+#marcaPendente::before{content:'';width:6px;height:6px;border-radius:50%;background:#f5a09b}
+@keyframes pulsaSalvar{0%,100%{box-shadow:0 0 0 0 rgba(230,126,34,.55)}50%{box-shadow:0 0 0 5px rgba(230,126,34,0)}}
+.bt.pulsando{animation:pulsaSalvar 2s ease-in-out infinite}
+/* linha de checkbox dentro de .campo — precisa anular o estilo de rótulo de campo */
+.campo label.opcao-check{display:flex;align-items:center;justify-content:flex-start;gap:9px;
+  font-size:13px;text-transform:none;letter-spacing:0;font-weight:500;color:var(--ink);
+  white-space:normal;cursor:pointer;margin:0;line-height:1.35;text-align:left}
+.campo label.opcao-check input[type=checkbox]{flex:0 0 auto;width:16px;height:16px;min-width:0;
+  padding:0;border:1px solid var(--line);border-radius:3px;margin:0;cursor:pointer;appearance:auto}
+.campo label.opcao-check .det{color:var(--ink-3);font-size:11.5px;font-weight:400}
+.campo .grupo-check{display:flex;flex-direction:column;gap:9px;margin-top:2px}
+tr.grupo-ciclo td{background:var(--surface-2);font-size:10.5px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--azul);padding:4px 10px;border-top:2px solid var(--ink-3)}
+/* menu de contexto (botão direito na grade) */
+.menu-ctx{position:fixed;z-index:9000;background:var(--surface);border:1px solid var(--line);
+  border-radius:9px;box-shadow:0 8px 24px rgba(0,0,0,.16);padding:4px;min-width:186px;display:flex;flex-direction:column;gap:1px}
+.menu-ctx button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:0;
+  padding:7px 10px;border-radius:6px;font:inherit;font-size:12.5px;color:var(--ink);cursor:pointer;white-space:nowrap}
+.menu-ctx button:hover{background:var(--azul-2);color:var(--azul)}
+.menu-ctx button.perigo-item:hover{background:#fdecec;color:var(--vermelho,#c0392b)}
+.menu-ctx .ctx-titulo{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-3);
+  padding:5px 10px 3px;font-weight:700}
+.menu-ctx .ctx-sep{height:1px;background:var(--line-2);margin:3px 4px}
+/* bandeirinha de nota */
+.letra.tem-nota, th.dia.tem-nota{position:relative}
+.letra.tem-nota::after, th.dia.tem-nota::after{content:'';position:absolute;right:0;bottom:0;
+  border-style:solid;border-width:0 0 6px 6px;border-color:transparent transparent #e67e22 transparent;pointer-events:none}
+th.dia.tem-nota::after{border-width:0 0 8px 8px}
+th.dia.tem-nota{background:#fff6ec}
+/* nota do turno: bandeirinha no canto da célula inteira */
+.cel.tem-nota-turno{position:relative}
+.cel.tem-nota-turno::after{content:'';position:absolute;right:1px;bottom:1px;
+  border-style:solid;border-width:0 0 9px 9px;border-color:transparent transparent #e67e22 transparent;pointer-events:none}
+.cel.tem-nota-turno{box-shadow:inset 0 0 0 1.5px rgba(230,126,34,.45)}
 .opcao-ciclo input{cursor:pointer}
-tr.inicio-grupo-ciclo > td{border-top:2px solid var(--ink-3) !important}
 .op-ciclo{font-weight:700;color:var(--azul)}
 .paleta-cores .bt-hist{width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;flex:0 0 auto}
 .paleta-cores .bt-hist svg{width:15px;height:15px}
@@ -355,6 +391,11 @@ body.foco-ativo{overflow:hidden}
 .cartao.modo-foco>header{flex:0 0 auto}
 .cartao.modo-foco>.corpo{flex:1 1 auto;padding:0;overflow:hidden;display:flex;flex-direction:column}
 .cartao.modo-foco .rolagem{flex:1 1 auto;max-height:none !important}
+/* cartões do painel que rolam por conta própria no modo foco */
+.cartao.modo-foco>.corpo.corpo-rolavel{overflow-y:auto;padding:14px 18px}
+.cartao.modo-foco .md-nome{width:auto !important;flex:1 1 auto;max-width:420px}
+.cartao.modo-foco .md-linha{margin:7px 0}
+.cartao.modo-foco .md-linha .trilho{height:12px}
 @media(max-width:700px){.cartao.modo-foco{inset:6px}}
 </style>
 </head>
@@ -366,7 +407,7 @@ body.foco-ativo{overflow:hidden}
     <img src="https://binder.com.br/wp-content/uploads/2021/01/energisa.png" alt="Energisa" style="height:42px">
     <div class="marca-sep"></div>
     <div class="marca-info">
-      <div class="l1" id="marcaAtualizado">Atualizado em: —</div>
+      <div class="l1"><span id="marcaAtualizado">Atualizado em: —</span><span id="marcaPendente" class="esconde">não salvo</span></div>
       <div class="l2">Desenvolvido por Adailson Junior</div>
       <div class="l3">Revisado por Leticia Danielle</div>
     </div>
@@ -473,8 +514,9 @@ body.foco-ativo{overflow:hidden}
         <div class="campo"><label for="fBusca">Buscar operador</label>
           <input id="fBusca" placeholder="nome ou letra" style="min-width:200px"></div>
         <div class="campo"><label for="fMesmaLetra">Ordenação</label>
-          <label class="opcao-ciclo" title="Agrupa quem começa o ciclo 6x3 no mesmo dia, em vez da ordem alfabética">
-            <input type="checkbox" id="fMesmaLetra"> Mesma letra
+          <label class="opcao-check" style="height:34px" title="Agrupa quem começa a trabalhar no mesmo dia do ciclo, em vez da ordem alfabética">
+            <input type="checkbox" id="fMesmaLetra">
+            <span>Mesma letra</span>
           </label></div>
       </div>
     </div>
@@ -680,6 +722,65 @@ body.foco-ativo{overflow:hidden}
 </div>
 
 <div id="toast"></div>
+<div class="menu-ctx esconde" id="menuContexto" role="menu"></div>
+
+<div class="editor esconde" id="modalSairEdicao">
+  <div class="caixa" style="max-width:440px">
+    <h3>Alterações não salvas</h3>
+    <p class="sub" id="sairEdicaoSub">Você fez alterações que ainda não foram salvas nem publicadas.</p>
+    <div class="botoes" style="flex-wrap:wrap">
+      <button class="bt perigo" id="sairDescartar" style="margin-right:auto">Descartar e sair</button>
+      <button class="bt" id="sairCancelar">Continuar editando</button>
+      <button class="bt primario" id="sairSalvar">Salvar e sair</button>
+    </div>
+  </div>
+</div>
+
+<div class="editor esconde" id="modalNota">
+  <div class="caixa">
+    <h3 id="notaTitulo">Inserir nota</h3>
+    <p class="sub" id="notaSub">A nota fica marcada com uma bandeirinha e aparece ao passar o mouse.</p>
+    <div style="display:flex;flex-direction:column;gap:11px">
+      <div class="campo">
+        <label for="notaTexto">Texto da nota</label>
+        <textarea id="notaTexto" maxlength="500" rows="5" placeholder="Ex.: trocou de turno com o Bruno, autorizado pela coordenação"
+          style="width:100%;resize:vertical;font-family:inherit;font-size:13px;padding:8px;border:1px solid var(--line);border-radius:8px"></textarea>
+        <div style="display:flex;justify-content:flex-end;margin-top:3px">
+          <span id="notaContador" style="font-size:11px;color:var(--ink-3)">0 / 500</span>
+        </div>
+      </div>
+      <div class="campo">
+        <label>Onde marcar</label>
+        <div class="grupo-check">
+          <label class="opcao-check">
+            <input type="checkbox" id="notaAlvoLetra">
+            <span>Inserir na letra <span class="det" id="notaLetraAtual"></span></span>
+          </label>
+          <div id="notaEscolhaLetra" class="esconde" style="margin-left:25px">
+            <select id="notaLetraSel" style="width:100%;font-size:12px"></select>
+          </div>
+          <label class="opcao-check">
+            <input type="checkbox" id="notaAlvoTurno">
+            <span>Inserir no turno inteiro, só neste dia <span class="det" id="notaTurnoAtual"></span></span>
+          </label>
+          <div id="notaEscolhaTurno" class="esconde" style="margin-left:25px">
+            <select id="notaTurnoSel" style="width:100%;font-size:12px"></select>
+          </div>
+          <label class="opcao-check">
+            <input type="checkbox" id="notaAlvoColuna">
+            <span>Inserir na coluna, dia inteiro <span class="det" id="notaDiaAtual"></span></span>
+          </label>
+        </div>
+      </div>
+    </div>
+    <div class="botoes">
+      <button class="bt perigo esconde" id="notaRemover" style="margin-right:auto">Remover nota</button>
+      <button class="bt" id="notaCancelar">Cancelar</button>
+      <button class="bt primario" id="notaSalvar">Salvar nota</button>
+    </div>
+  </div>
+</div>
+
 <div class="editor esconde" id="modalAus">
   <div class="caixa">
     <h3>Registrar ausência</h3>
@@ -816,6 +917,9 @@ body.foco-ativo{overflow:hidden}
   </div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- fork do SheetJS com suporte a formatação de células (cores, negrito, bordas).
+     Sobrescreve o XLSX global; se não carregar, o export continua funcionando sem cor. -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
@@ -1461,7 +1565,46 @@ const ORDEM_POLOS = ["Aracaju - 1","Aracaju - 2","Itabaiana","Lagarto","São Cri
                      "Dores","Propriá","Maruim","Aracaju - 3","MPS"];
 const RANK_POLO = {}; ORDEM_POLOS.forEach((p, i) => RANK_POLO[p] = i);
 
-const FERIADOS = ["01-01","03-17","04-21","05-01","07-08","09-07","10-12","11-02","11-15","12-25"];
+/* Feriados fixos: nacionais + estaduais de Sergipe + municipais de Aracaju.
+   01-01 Confraternização · 03-17 Emancipação de Aracaju · 04-21 Tiradentes
+   05-01 Trabalho · 06-24 São João (SE) · 07-08 Emancipação de Sergipe
+   09-07 Independência · 10-12 N. Sra. Aparecida · 11-02 Finados
+   11-15 Proclamação da República · 11-20 Consciência Negra (nacional desde 2024)
+   12-08 N. Sra. da Conceição, padroeira de Aracaju · 12-25 Natal */
+const FERIADOS = ["01-01","03-17","04-21","05-01","06-24","07-08","09-07","10-12",
+                  "11-02","11-15","11-20","12-08","12-25"];
+
+/* Feriados móveis, calculados a partir da Páscoa (algoritmo de Meeus/Butcher):
+   Carnaval (segunda e terça), Sexta-feira Santa e Corpus Christi.
+   O cálculo vale para qualquer ano — 2035 e além inclusive. */
+const CACHE_MOVEIS = {};
+function domingoDePascoa(ano) {
+  const a = ano % 19, b = Math.floor(ano / 100), c = ano % 100;
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const mes = Math.floor((h + l - 7 * m + 114) / 31);
+  const dia = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(ano, mes - 1, dia);
+}
+function feriadosMoveis(ano) {
+  if (CACHE_MOVEIS[ano]) return CACHE_MOVEIS[ano];
+  const pascoa = domingoDePascoa(ano);
+  const desloca = n => {
+    const dt = new Date(pascoa.getFullYear(), pascoa.getMonth(), pascoa.getDate() + n);
+    return String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+  };
+  const set = new Set([
+    desloca(-48),   // segunda de carnaval
+    desloca(-47),   // terça de carnaval
+    desloca(-2),    // sexta-feira santa
+    desloca(60),    // corpus christi
+  ]);
+  CACHE_MOVEIS[ano] = set;
+  return set;
+}
 
 const TURNOS_TRABALHO = ["06-14","08-17","10-18","14-22","22-06","MPS"];
 const TURNOS_AUSENCIA = ["TREINAMENTO","FOLGA","SOBREAVISO","ACT","BANCO_HORAS","FERIAS","ATESTADO"];
@@ -1523,6 +1666,7 @@ const S = {
   estadoInicial: null,
   polo: "Todos", busca: "", compactaFolga: false,
   agruparCiclo: false,        // "Mesma letra": ordena a visão por operador pelo início do ciclo 6x3
+  notas: {},                  // notas: "L:ano-mes|turno|dia|letra" ou "C:ano-mes|dia" -> {texto, em, por}
   editando: false,
   turnosOcultos: new Set(),   // turnos escondidos da grade (filtro "Turnos exibidos")
   usuarioAtual: null,         // login do admin autenticado nesta sessão
@@ -1576,7 +1720,22 @@ function carimbarAtualizacao() {
   S.atualizadoEm = paraIso(agora);
   S.atualizadoHora = String(agora.getHours()).padStart(2, '0') + ':' + String(agora.getMinutes()).padStart(2, '0');
   S.atualizadoPor = S.usuarioAtual;
+  alteracoesPendentes = true;      // toda mudança na escala passa por aqui
+  atualizarAvisoPendencia();
   atualizarCarimbo();
+}
+/* ═══════════════ controle de alterações não salvas ═══════════════
+   O botão "Sair da edição" não salva nada: ele só encerra a sessão. Sem um
+   aviso, dava pra sair achando que tinha salvo e perder o trabalho. */
+let alteracoesPendentes = false;
+function atualizarAvisoPendencia() {
+  const bt = $('#btSalvarAlteracoes');
+  if (bt) {
+    bt.classList.toggle('pulsando', alteracoesPendentes);
+    bt.title = alteracoesPendentes ? 'Há alterações não salvas' : 'Tudo salvo';
+  }
+  const marca = $('#marcaPendente');
+  if (marca) marca.classList.toggle('esconde', !alteracoesPendentes);
 }
 function atualizarAvisoMesReferencia() {
   const caixa = $('#avisoMesReferencia');
@@ -1589,7 +1748,8 @@ function atualizarAvisoMesReferencia() {
 
 function ehFds(a, m, d) { const w = new Date(a, m - 1, d).getDay(); return w === 0 || w === 6; }
 function ehFeriado(a, m, d) {
-  return FERIADOS.indexOf(String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0')) >= 0;
+  const chave = String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  return FERIADOS.indexOf(chave) >= 0 || feriadosMoveis(a).has(chave);
 }
 function ehFdsFeriado(a, m, d) { return ehFds(a, m, d) || ehFeriado(a, m, d); }
 function ehDiaUtil(a, m, d) { return !ehFdsFeriado(a, m, d); }
@@ -2434,10 +2594,14 @@ function desenharEscala() {
     if (hoje) cls += ' hoje';
     if (viradaMes) cls += ' virada';
     if (!it.res) cls += ' sem-escala';
+    const notaCol = lerNota(chaveNotaColuna(ano, mes, dia));
+    if (notaCol) cls += ' tem-nota';
     const th = el('th', {
       class: cls,
       title: br(iso(ano, mes, dia)) + (ehFeriado(ano, mes, dia) ? ' · feriado' : '') + (hoje ? ' · hoje' : '') + (!it.res ? ' · escala não gerada' : '')
+        + (notaCol ? `\n📝 Nota: ${notaCol.texto}` : '')
     });
+    th.dataset.ano = String(ano); th.dataset.mes = String(mes); th.dataset.dia = String(dia);
     th.appendChild(el('span', { class: 'num', text: String(dia) }));
     th.appendChild(el('span', { class: 'sem', text: DIAS_SEM[new Date(ano, mes - 1, dia).getDay()] }));
     tr1.appendChild(th);
@@ -2478,11 +2642,14 @@ function desenharEscala() {
         tr.appendChild(td); return;
       }
       const letras = res.escala[turno][dia] || [];
+      const notaTur = lerNota(chaveNotaTurno(ano, mes, dia, turno));
       const cel = el('button', {
-        class: 'cel' + (fixo ? ' cel-fixo' : ''), 'data-turno': turno,
+        class: 'cel' + (fixo ? ' cel-fixo' : '') + (notaTur ? ' tem-nota-turno' : ''), 'data-turno': turno,
         'data-ano': String(ano), 'data-mes': String(mes), 'data-dia': String(dia),
         title: `${ROTULO[turno]} · ${br(iso(ano, mes, dia))} — clique duplo para editar`
+          + (notaTur ? `\n📝 Nota do turno: ${notaTur.texto}` : '')
       });
+      const polosDia = TURNOS_TRABALHO.indexOf(turno) >= 0 ? polosDoTurno(res, dia, turno) : {};
       const montaLetra = (l) => {
         let c = 'letra';
         const chaveCor = `${ano}-${mes}|${turno}|${dia}|${l}`;
@@ -2498,7 +2665,10 @@ function desenharEscala() {
           else if (assist.has(l)) c += ' assist';
           else if (ajuEsp.has(l)) c += ' aju';
         }
-        const span = el('span', { class: c, text: l, title: nomeDe(l) });
+        const nota = lerNota(chaveNotaLetra(ano, mes, dia, turno, l));
+        if (nota) c += ' tem-nota';
+        const poloTxt = polosDia[l] ? `\nPolo do dia: ${polosDia[l]}` : '';
+        const span = el('span', { class: c, text: l, title: nomeDe(l) + poloTxt + (nota ? `\n📝 Nota: ${nota.texto}` : '') });
         span.dataset.corKey = chaveCor;
         return span;
       };
@@ -2540,27 +2710,65 @@ function nomeDe(letra) {
 }
 
 /* ═══════════════ visão por operador ═══════════════ */
-/* ═══════════════ "Mesma letra": ordenar pelo início do ciclo 6x3 ═══════════════
-   Descobre em que dia o operador retoma o trabalho depois de uma folga. Dias de
-   ausência (férias, atestado, treinamento...) são ignorados: eles mascaram o dia
-   mas não deslocam o ciclo por baixo. O dia encontrado é normalizado no ciclo de
-   9 dias, então quem roda no mesmo ritmo cai sempre no mesmo grupo, mesmo que a
-   primeira virada apareça em dias diferentes do mês. */
-function fasedoCiclo(res, letra, dias) {
+/* ═══════════════ polo (regional) efetivo do dia ═══════════════
+   Vem direto da tabela REGIONAIS mostrada na aba Informações: a regional que
+   cada operador cobre depende da POSIÇÃO da letra dentro da célula e de
+   QUANTOS operadores tem naquele turno no dia. Com menos gente, cada posição
+   acumula mais de uma regional (ex.: PPR/MRI, LGT/SCT) — por isso a etiqueta
+   mostra todas as siglas daquela posição, como na tabela. */
+function polosDoTurno(res, dia, turno) {
+  const mapa = {};
+  const letras = (res.escala[turno] || {})[dia] || [];
+  if (!letras.length) return mapa;
+  // a tabela vale para os turnos diurnos rotativos; 08-17 é o fixo do AJU-3
+  if (turno === '08-17') { letras.forEach(l => mapa[l] = 'AJU-3'); return mapa; }
+  if (turno === 'MPS') { letras.forEach(l => mapa[l] = 'MPS'); return mapa; }
+  letras.forEach((l, i) => {
+    const siglas = labelsRegional(i + 1, letras.length);
+    mapa[l] = siglas.length ? siglas.join(' / ') : '';
+  });
+  return mapa;
+}
+function poloDoDia(res, dia, turno, letra) {
+  if (!res || !turno) return '';
+  try { return polosDoTurno(res, dia, turno)[letra] || ''; } catch (e) { return ''; }
+}
+
+/* ═══════════════ "Mesma letra": agrupar quem volta da folga no mesmo dia ═══════════════
+   Um "início" é o dia em que o operador volta a trabalhar depois de uma folga.
+   Para reconhecer também quem já começa trabalhando no dia 1, olhamos os
+   últimos dias do mês anterior quando ele existe. Dias de ausência (férias,
+   atestado, treinamento...) são pulados: mascaram o dia mas não deslocam o
+   ciclo por baixo. */
+function iniciosNoMes(res, letra, dias) {
   const TRAB = new Set(TURNOS_TRABALHO);
-  const status = new Array(dias + 1);
-  for (let d = 1; d <= dias; d++) {
-    const t = turnoDe(res, letra, d);
-    status[d] = t ? (TRAB.has(t) ? 'T' : 'A') : ((res.escala['FOLGA'] || {})[d] || []).indexOf(letra) >= 0 ? 'F' : 'A';
+  const marca = (r, d) => {
+    const t = turnoDe(r, letra, d);
+    if (t && TRAB.has(t)) return 'T';
+    if (t === 'FOLGA' || !t) return 'F';
+    return 'A';                       // férias, atestado, treinamento, ACT, BH, sobreaviso
+  };
+  // cauda do mês anterior, pra saber se o dia 1 já é uma volta de folga
+  const [anoAnt, mesAnt] = res.mes === 1 ? [res.ano - 1, 12] : [res.ano, res.mes - 1];
+  const resAnt = acharMes(anoAnt, mesAnt);
+  const cauda = [];
+  if (resAnt) {
+    const dAnt = resAnt.dias || diasNoMes(anoAnt, mesAnt);
+    for (let d = Math.max(1, dAnt - 5); d <= dAnt; d++) cauda.push(marca(resAnt, d));
   }
-  for (let d = 2; d <= dias; d++) {
-    if (status[d] !== 'T') continue;
-    let ant = d - 1;
-    while (ant >= 1 && status[ant] === 'A') ant--;   // pula dias mascarados por ausência
-    if (ant >= 1 && status[ant] === 'F') return { fase: ((d - 1) % 9) + 1, dia: d };
+  const status = cauda.concat();       // índice 0..cauda.length-1 = mês anterior
+  const base = cauda.length;           // status[base + (d-1)] = dia d do mês atual
+  for (let d = 1; d <= dias; d++) status.push(marca(res, d));
+
+  const inicios = [];
+  for (let i = base; i < status.length; i++) {
+    if (status[i] !== 'T') continue;
+    let ant = i - 1;
+    while (ant >= 0 && status[ant] === 'A') ant--;   // pula dias mascarados por ausência
+    if (ant >= 0 && status[ant] === 'F') inicios.push(i - base + 1);
   }
-  // quem nunca vira de folga pra trabalho no mês (férias o mês inteiro, por ex.)
-  return { fase: 99, dia: 99 };
+  if (!inicios.length) return { primeiro: 99, inicios: [] };
+  return { primeiro: inicios[0], inicios };
 }
 
 function desenharOperador() {
@@ -2575,9 +2783,9 @@ function desenharOperador() {
   if (busca) lista = lista.filter(o => o.nome.toUpperCase().indexOf(busca) >= 0 || o.letra === busca);
   const fases = {};
   if (S.agruparCiclo) {
-    lista.forEach(o => { fases[o.letra] = fasedoCiclo(res, o.letra, dias); });
-    lista = lista.slice().sort((a, b) =>
-      (fases[a.letra].fase - fases[b.letra].fase) || a.nome.localeCompare(b.nome));
+    lista.forEach(o => { fases[o.letra] = iniciosNoMes(res, o.letra, dias); });
+    const chaveOrd = o => fases[o.letra].primeiro;
+    lista = lista.slice().sort((a, b) => (chaveOrd(a) - chaveOrd(b)) || a.nome.localeCompare(b.nome));
   } else {
     lista = lista.slice().sort((a, b) => a.nome.localeCompare(b.nome));
   }
@@ -2598,9 +2806,17 @@ function desenharOperador() {
   for (const o of lista) {
     const tr = el('tr');
     const info = S.agruparCiclo ? fases[o.letra] : null;
-    if (info) {
-      if (faseAnterior !== null && info.fase !== faseAnterior) tr.classList.add('inicio-grupo-ciclo');
-      faseAnterior = info.fase;
+    if (info && info.primeiro !== faseAnterior) {
+      const trg = el('tr', { class: 'grupo-ciclo' });
+      const tdg = el('td', {
+        text: info.primeiro === 99
+          ? 'Sem volta de folga neste mês'
+          : `Voltam da folga no dia ${info.primeiro}`
+      });
+      tdg.colSpan = dias + 1;
+      trg.appendChild(tdg);
+      tbody.appendChild(trg);
+      faseAnterior = info.primeiro;
     }
     const tdN = el('td', { class: 'col-op' });
     const n1 = el('span', { class: 'op-nome' });
@@ -2613,8 +2829,10 @@ function desenharOperador() {
       sub.appendChild(document.createTextNode(legendas.length ? ' · ' : ''));
       sub.appendChild(el('span', {
         class: 'op-ciclo',
-        text: info.fase === 99 ? 'sem ciclo no mês' : 'inicia dia ' + info.dia,
-        title: info.fase === 99 ? 'Não há virada de folga para trabalho neste mês' : 'Primeiro dia de trabalho depois de uma folga'
+        text: info.primeiro === 99 ? 'sem volta de folga' : 'volta dia ' + info.primeiro,
+        title: info.primeiro === 99
+          ? 'Não há volta de folga para trabalho neste mês'
+          : `Volta ao trabalho depois da folga nos dias: ${info.inicios.join(', ')}`
       }));
     }
     tdN.appendChild(sub);
@@ -2624,9 +2842,10 @@ function desenharOperador() {
       const turno = turnoDe(res, o.letra, d);
       const ab = turno ? ABREV[turno] : 'F';
       const cls = turno ? CLASSE_LINHA[turno] : 'F';
+      const poloDia = turno ? poloDoDia(res, d, turno, o.letra) : '';
       const td = el('td', {
         class: 'mini ab-' + cls,
-        title: `${o.nome} · dia ${d}: ${turno ? ROTULO[turno] : 'Folga'}`,
+        title: `${o.nome} · dia ${d}: ${turno ? ROTULO[turno] : 'Folga'}` + (poloDia ? `\nPolo do dia: ${poloDia}` : ''),
         text: ab
       });
       tr.appendChild(td);
@@ -2793,6 +3012,9 @@ function desenharAusencias() {
 
 /* ═══════════════ painel ═══════════════ */
 function desenharPainel() {
+  // o painel é remontado do zero: se o cartão focado for reconstruído, a
+  // referência do modo foco fica apontando pra um elemento que saiu do DOM
+  if (cartaoFocoAtivo && cartaoFocoAtivo.idCartao === 'cartaoMadrugadas') sairModoFoco();
   const area = $('#areaPainel'); area.innerHTML = '';
   const res = mesAtual();
   if (!res) { area.appendChild(el('p', { class: 'dica', text: 'Gere a escala para ver o painel.' })); return; }
@@ -2896,16 +3118,26 @@ function desenharPainel() {
 
   // ranking de madrugadas + ausências
   const c3 = el('div', { style: 'height:100%;min-height:0;display:flex;flex-direction:column;gap:16px' });
-  const c3a = el('div', { class: 'cartao', style: 'margin-bottom:0;display:flex;flex-direction:column;min-height:0;flex:1 1 0' });
-  c3a.appendChild(el('header', {}, [el('h2', { text: 'Distribuição das madrugadas' })]));
-  const corpo3 = el('div', { class: 'corpo', style: 'overflow-y:auto;flex:1;min-height:0;padding-right:12px' });
+  const c3a = el('div', { class: 'cartao', id: 'cartaoMadrugadas', style: 'margin-bottom:0;display:flex;flex-direction:column;min-height:0;flex:1 1 0' });
+  const cabMadr = el('header', {}, [el('h2', { text: 'Distribuição das madrugadas' })]);
+  const btMadr = el('button', {
+    class: 'bt bt-icone nao-imprime', id: 'btFocoMadrugadas', type: 'button',
+    title: 'Modo foco (tela cheia)', style: 'margin-left:auto'
+  });
+  btMadr.setAttribute('aria-pressed', 'false');
+  btMadr.setAttribute('aria-label', 'Ativar modo foco');
+  btMadr.innerHTML = ICONE_EXPANDIR;
+  btMadr.onclick = e => { e.stopPropagation(); alternarModoFoco('cartaoMadrugadas', 'btFocoMadrugadas'); };
+  cabMadr.appendChild(btMadr);
+  c3a.appendChild(cabMadr);
+  const corpo3 = el('div', { class: 'corpo corpo-rolavel', style: 'overflow-y:auto;flex:1;min-height:0;padding-right:12px' });
   const rank = S.ops.filter(o => madr[o.letra] > 0).sort((a, b) => madr[b.letra] - madr[a.letra]);
   const maxN = rank.length ? madr[rank[0].letra] : 1;
   if (!rank.length) corpo3.appendChild(el('p', { class: 'dica', text: 'Nenhuma madrugada atribuída neste mês.' }));
   rank.forEach(o => {
-    const l = el('div', { style: 'display:flex;align-items:center;gap:9px;margin:3px 0' });
+    const l = el('div', { class: 'md-linha', style: 'display:flex;align-items:center;gap:9px;margin:3px 0' });
     l.appendChild(el('span', { class: 'selo-letra', text: o.letra }));
-    l.appendChild(el('span', { style: 'font-size:12px;width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap', text: o.nome }));
+    l.appendChild(el('span', { class: 'md-nome', style: 'font-size:12px;width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap', text: o.nome }));
     const trilho = el('div', { class: 'trilho' });
     trilho.appendChild(el('div', { class: 'barra', style: `width:${Math.round(madr[o.letra] / maxN * 100)}%` }));
     l.appendChild(trilho);
@@ -3295,10 +3527,23 @@ async function exportarRelatorioPDF() {
 }
 
 /* ═══════════════ edição inline da célula (estilo planilha) ═══════════════ */
+/* ═══════════════ notas na escala ═══════════════
+   Duas âncoras possíveis: uma letra específica num turno/dia, ou a coluna
+   inteira (o dia). A chave da letra reaproveita o mesmo formato da chave de
+   cor, então nota e cor apontam sempre para a mesma célula. */
+function chaveNotaLetra(ano, mes, dia, turno, letra) { return `L:${ano}-${mes}|${turno}|${dia}|${letra}`; }
+function chaveNotaTurno(ano, mes, dia, turno) { return `T:${ano}-${mes}|${turno}|${dia}`; }
+function chaveNotaColuna(ano, mes, dia) { return `C:${ano}-${mes}|${dia}`; }
+function lerNota(chave) { return S.notas ? S.notas[chave] : null; }
+function textoResumido(txt, max) {
+  const t = (txt || '').replace(/\s+/g, ' ').trim();
+  return t.length > max ? t.slice(0, max - 1) + '…' : t;
+}
+
 /* ═══════════════ desfazer / refazer (histórico de edição) ═══════════════
    Guarda fotos do estado editável antes de cada passo. Só vale para a sessão
    de edição atual — sair da edição ou carregar outro projeto zera as pilhas. */
-const CAMPOS_HISTORICO = ['ops', 'meses', 'historico', 'manual', 'corManual', 'estadoInicial', 'mesReferencia'];
+const CAMPOS_HISTORICO = ['ops', 'meses', 'historico', 'manual', 'corManual', 'notas', 'estadoInicial', 'mesReferencia'];
 const LIMITE_HISTORICO = 60;
 let pilhaDesfazer = [], pilhaRefazer = [];
 
@@ -3460,68 +3705,301 @@ function aplicarCorManual(cor) {
   aviso(cor ? 'Cor aplicada.' : 'Cor removida — letra volta ao preto padrão.');
 }
 
-/* ═══════════════ exportação ═══════════════ */
-function matrizMes(res) {
+/* ═══════════════ exportação para Excel ═══════════════
+   A planilha sai formatada: título mesclado, cabeçalho de dois níveis (número
+   do dia + dia da semana), fim de semana e feriado destacados, cor de fundo por
+   turno igual à da tela, bordas e larguras de coluna ajustadas. A formatação
+   depende do xlsx-js-style; se ele não carregar, o arquivo sai sem cor mas com
+   todo o conteúdo. */
+const XLS_COR = {
+  tinta: '1F2933', claro: 'FFFFFF', azul: '1A5FDB', azulEsc: '0D3A8A',
+  cinza: 'F1F3F5', linha: 'D5DBE1', laranja: 'C2410C', cinza2: 'E3E8EF', sub: '667080',
+};
+const XLS_TURNO = {
+  '06-14': 'DCE9FB', '08-17': 'E4E2FB', '10-18': 'E4E2FB', '14-22': 'FDE8CF',
+  '22-06': 'EADCF8', 'MPS': 'FBDCE7', 'FOLGA': 'F4F6F8', 'TREINAMENTO': 'D8F0E8',
+  'SOBREAVISO': 'D6EFF5', 'ACT': 'E9ECEF', 'BANCO_HORAS': 'FCF3CF',
+  'FERIAS': 'D6F5DC', 'ATESTADO': 'FADBD8',
+};
+const XLS_FIO = { style: 'thin', color: { rgb: XLS_COR.linha } };
+const XLS_BORDA = { top: XLS_FIO, bottom: XLS_FIO, left: XLS_FIO, right: XLS_FIO };
+const XLS_EST = {
+  titulo: { font: { bold: true, sz: 15, color: { rgb: XLS_COR.claro } }, fill: { fgColor: { rgb: XLS_COR.azulEsc } },
+            alignment: { horizontal: 'left', vertical: 'center', indent: 1 } },
+  sub: { font: { sz: 10, italic: true, color: { rgb: XLS_COR.sub } },
+         alignment: { horizontal: 'left', vertical: 'center', indent: 1 } },
+  cab: { font: { bold: true, sz: 10, color: { rgb: XLS_COR.claro } }, fill: { fgColor: { rgb: XLS_COR.azul } },
+         alignment: { horizontal: 'center', vertical: 'center' }, border: XLS_BORDA },
+  cabFds: { font: { bold: true, sz: 10, color: { rgb: XLS_COR.claro } }, fill: { fgColor: { rgb: XLS_COR.laranja } },
+            alignment: { horizontal: 'center', vertical: 'center' }, border: XLS_BORDA },
+  rotulo: { font: { bold: true, sz: 10, color: { rgb: XLS_COR.tinta } }, fill: { fgColor: { rgb: XLS_COR.cinza } },
+            alignment: { horizontal: 'left', vertical: 'center', indent: 1 }, border: XLS_BORDA },
+  total: { font: { bold: true, sz: 10, color: { rgb: XLS_COR.tinta } }, fill: { fgColor: { rgb: XLS_COR.cinza2 } },
+           alignment: { horizontal: 'center', vertical: 'center' }, border: XLS_BORDA },
+  texto: { font: { sz: 10, color: { rgb: XLS_COR.tinta } },
+           alignment: { horizontal: 'left', vertical: 'center', indent: 1 }, border: XLS_BORDA },
+  num: { font: { sz: 10, color: { rgb: XLS_COR.tinta } },
+         alignment: { horizontal: 'center', vertical: 'center' }, border: XLS_BORDA },
+};
+function xlsCelTurno(turno) {
+  return {
+    font: { sz: 10, color: { rgb: XLS_COR.tinta } },
+    fill: { fgColor: { rgb: XLS_TURNO[turno] || 'FFFFFF' } },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+    border: XLS_BORDA
+  };
+}
+function xlsPinta(ws, r, c, estilo) {
+  const ref = XLSX.utils.encode_cell({ r, c });
+  if (!ws[ref]) ws[ref] = { t: 's', v: '' };
+  ws[ref].s = estilo;
+}
+function xlsCarimbo() {
+  const d = S.atualizadoEm ? br(S.atualizadoEm) : br(paraIso(new Date()));
+  const h = S.atualizadoHora ? ` às ${S.atualizadoHora}` : '';
+  const p = S.atualizadoPor ? ` por ${S.atualizadoPor}` : '';
+  return `Atualizado em ${d}${h}${p} · ${S.ops.length} operadores · ciclo 6x3`;
+}
+
+function abaMes(res) {
   const { ano, mes, dias } = res;
-  const linhas = [[`ESCALA OPERACIONAL — ${MESES[mes - 1]}/${ano}`], []];
-  const cab = ['Turno'];
-  for (let d = 1; d <= dias; d++) cab.push(`${d} ${DIAS_SEM[new Date(ano, mes - 1, d).getDay()]}`);
-  linhas.push(cab);
-  ORDEM_LINHAS.forEach(t => {
+  const nCols = dias + 1;
+  const linhas = [];
+  linhas.push([`ESCALA OPERACIONAL — ${MESES[mes - 1].toUpperCase()} / ${ano}`]);
+  linhas.push([xlsCarimbo()]);
+  linhas.push([]);
+  const cabNum = ['Turno'], cabSem = [''];
+  for (let d = 1; d <= dias; d++) {
+    cabNum.push(d);
+    cabSem.push(DIAS_SEM[new Date(ano, mes - 1, d).getDay()] + (ehFeriado(ano, mes, d) ? '*' : ''));
+  }
+  linhas.push(cabNum); linhas.push(cabSem);
+
+  const visiveis = ORDEM_LINHAS.filter(t => (
+    t === 'FOLGA' || TURNOS_TRABALHO.indexOf(t) >= 0 ||
+    Object.keys(res.escala[t] || {}).some(d => (res.escala[t][d] || []).length)
+  ));
+  visiveis.forEach(t => {
     const l = [ROTULO[t]];
     for (let d = 1; d <= dias; d++) l.push((res.escala[t][d] || []).join(' '));
     linhas.push(l);
   });
-  return linhas;
+  const tot = ['Operadores no dia'];
+  for (let d = 1; d <= dias; d++) tot.push(TURNOS_TRABALHO.reduce((s, t) => s + (res.escala[t][d] || []).length, 0));
+  linhas.push(tot);
+
+  const ws = XLSX.utils.aoa_to_sheet(linhas);
+  ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: linhas.length - 1, c: nCols - 1 } });
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: nCols - 1 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: nCols - 1 } },
+    { s: { r: 3, c: 0 }, e: { r: 4, c: 0 } },
+  ];
+  ws['!cols'] = [{ wch: 22 }].concat(Array.from({ length: dias }, () => ({ wch: 9 })));
+  ws['!rows'] = [{ hpt: 26 }, { hpt: 15 }, { hpt: 6 }, { hpt: 18 }, { hpt: 14 }];
+
+  for (let c = 0; c < nCols; c++) { xlsPinta(ws, 0, c, XLS_EST.titulo); xlsPinta(ws, 1, c, XLS_EST.sub); }
+  xlsPinta(ws, 3, 0, XLS_EST.cab); xlsPinta(ws, 4, 0, XLS_EST.cab);
+  for (let d = 1; d <= dias; d++) {
+    const destaque = ehFdsFeriado(ano, mes, d);
+    xlsPinta(ws, 3, d, destaque ? XLS_EST.cabFds : XLS_EST.cab);
+    xlsPinta(ws, 4, d, destaque ? XLS_EST.cabFds : XLS_EST.cab);
+  }
+  visiveis.forEach((t, i) => {
+    const r = 5 + i;
+    xlsPinta(ws, r, 0, XLS_EST.rotulo);
+    for (let d = 1; d <= dias; d++) xlsPinta(ws, r, d, xlsCelTurno(t));
+  });
+  const rTot = 5 + visiveis.length;
+  for (let c = 0; c < nCols; c++) xlsPinta(ws, rTot, c, XLS_EST.total);
+  return ws;
 }
-function matrizOperador(res) {
+
+function abaOperador(res) {
   const { ano, mes, dias } = res;
-  const linhas = [[`POR OPERADOR — ${MESES[mes - 1]}/${ano}`], []];
+  const linhas = [];
+  linhas.push([`POR OPERADOR — ${MESES[mes - 1].toUpperCase()} / ${ano}`]);
+  linhas.push([xlsCarimbo()]);
+  linhas.push([]);
   const cab = ['Letra', 'Operador', 'Polo', 'Tipo'];
-  for (let d = 1; d <= dias; d++) cab.push(String(d));
+  for (let d = 1; d <= dias; d++) cab.push(d);
   cab.push('Dias', 'Madrugadas');
   linhas.push(cab);
-  S.ops.slice().sort((a, b) => (RANK_POLO[polo(a)] ?? 99) - (RANK_POLO[polo(b)] ?? 99) || a.nome.localeCompare(b.nome))
-    .forEach(o => {
-      const l = [o.letra, o.nome, polo(o), o.tipo || ''];
-      let t2 = 0, n = 0;
-      for (let d = 1; d <= dias; d++) {
-        const turno = turnoDe(res, o.letra, d);
-        if (turno && TURNOS_TRABALHO.indexOf(turno) >= 0) { t2++; if (turno === '22-06') n++; }
-        l.push(turno ? ABREV[turno] : 'F');
-      }
-      l.push(t2, n); linhas.push(l);
-    });
-  return linhas;
+  const nCols = cab.length;
+
+  const ordenados = S.ops.slice().sort((a, b) =>
+    (RANK_POLO[polo(a)] ?? 99) - (RANK_POLO[polo(b)] ?? 99) || a.nome.localeCompare(b.nome));
+  const turnos = [];
+  ordenados.forEach(o => {
+    const l = [o.letra, o.nome, polo(o), o.tipo || ''];
+    const seq = [];
+    let t2 = 0, n = 0;
+    for (let d = 1; d <= dias; d++) {
+      const turno = turnoDe(res, o.letra, d);
+      if (turno && TURNOS_TRABALHO.indexOf(turno) >= 0) { t2++; if (turno === '22-06') n++; }
+      seq.push(turno || 'FOLGA');
+      l.push(turno ? ABREV[turno] : 'F');
+    }
+    l.push(t2, n);
+    linhas.push(l); turnos.push(seq);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(linhas);
+  ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: linhas.length - 1, c: nCols - 1 } });
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: nCols - 1 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: nCols - 1 } },
+  ];
+  ws['!cols'] = [{ wch: 6 }, { wch: 34 }, { wch: 16 }, { wch: 11 }]
+    .concat(Array.from({ length: dias }, () => ({ wch: 4.5 })), [{ wch: 7 }, { wch: 12 }]);
+  ws['!rows'] = [{ hpt: 26 }, { hpt: 15 }, { hpt: 6 }, { hpt: 18 }];
+  ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 3, c: 0 }, e: { r: 3, c: 3 } }) };
+
+  for (let c = 0; c < nCols; c++) { xlsPinta(ws, 0, c, XLS_EST.titulo); xlsPinta(ws, 1, c, XLS_EST.sub); }
+  for (let c = 0; c < nCols; c++) {
+    const diaCol = c >= 4 && c < 4 + dias;
+    const destaque = diaCol && ehFdsFeriado(ano, mes, c - 3);
+    xlsPinta(ws, 3, c, destaque ? XLS_EST.cabFds : XLS_EST.cab);
+  }
+  turnos.forEach((seq, i) => {
+    const r = 4 + i;
+    xlsPinta(ws, r, 0, XLS_EST.num);
+    xlsPinta(ws, r, 1, XLS_EST.texto);
+    xlsPinta(ws, r, 2, XLS_EST.texto);
+    xlsPinta(ws, r, 3, XLS_EST.texto);
+    seq.forEach((t, j) => xlsPinta(ws, r, 4 + j, xlsCelTurno(t)));
+    xlsPinta(ws, r, 4 + dias, XLS_EST.total);
+    xlsPinta(ws, r, 5 + dias, XLS_EST.total);
+  });
+  return ws;
 }
+
+function abaCadastro() {
+  const cab = ['Letra', 'Nome', 'Login', 'Polo principal', 'Polo secundário', 'Tipo', 'AJU especial', 'Sem madrugada'];
+  const linhas = [['CADASTRO DE OPERADORES'], [xlsCarimbo()], [], cab];
+  S.ops.slice().sort((a, b) => a.nome.localeCompare(b.nome)).forEach(o =>
+    linhas.push([o.letra, o.nome, o.login || '', polo(o), o.secundario || '', o.tipo || '',
+                 o.aju_especial || 'Não', o.sem_madrugada ? 'Sim' : 'Não']));
+  const ws = XLSX.utils.aoa_to_sheet(linhas);
+  ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: linhas.length - 1, c: cab.length - 1 } });
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: cab.length - 1 } },
+                   { s: { r: 1, c: 0 }, e: { r: 1, c: cab.length - 1 } }];
+  ws['!cols'] = [{ wch: 7 }, { wch: 36 }, { wch: 11 }, { wch: 17 }, { wch: 17 }, { wch: 12 }, { wch: 13 }, { wch: 15 }];
+  ws['!rows'] = [{ hpt: 26 }, { hpt: 15 }, { hpt: 6 }, { hpt: 18 }];
+  ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 3, c: 0 }, e: { r: 3, c: cab.length - 1 } }) };
+  for (let c = 0; c < cab.length; c++) {
+    xlsPinta(ws, 0, c, XLS_EST.titulo); xlsPinta(ws, 1, c, XLS_EST.sub); xlsPinta(ws, 3, c, XLS_EST.cab);
+  }
+  for (let r = 4; r < linhas.length; r++) {
+    for (let c = 0; c < cab.length; c++) xlsPinta(ws, r, c, c === 0 ? XLS_EST.num : XLS_EST.texto);
+  }
+  return ws;
+}
+
+function abaNotas() {
+  const cab = ['Data', 'Alvo', 'Turno', 'Operador', 'Nota', 'Registrada em', 'Por'];
+  const linhas = [['NOTAS DA ESCALA'], [xlsCarimbo()], [], cab];
+  const chaves = Object.keys(S.notas || {}).sort();
+  chaves.forEach(k => {
+    const nota = S.notas[k];
+    if (!nota) return;
+    const corpo = k.slice(2);
+    if (k.startsWith('L:')) {
+      const [anoMes, turno, dia, letra] = corpo.split('|');
+      const [ano, mes] = anoMes.split('-').map(Number);
+      linhas.push([br(iso(ano, mes, Number(dia))), 'Letra', ROTULO[turno] || turno,
+                   `${letra} — ${(nomeDe(letra) || '').replace(/^\[[^\]]+\]\s*/, '')}`,
+                   nota.texto, nota.em ? br(nota.em) : '', nota.por || '']);
+    } else if (k.startsWith('T:')) {
+      const [anoMes, turno, dia] = corpo.split('|');
+      const [ano, mes] = anoMes.split('-').map(Number);
+      linhas.push([br(iso(ano, mes, Number(dia))), 'Turno (só neste dia)', ROTULO[turno] || turno, '',
+                   nota.texto, nota.em ? br(nota.em) : '', nota.por || '']);
+    } else {
+      const [anoMes, dia] = corpo.split('|');
+      const [ano, mes] = anoMes.split('-').map(Number);
+      linhas.push([br(iso(ano, mes, Number(dia))), 'Coluna (dia inteiro)', '', '',
+                   nota.texto, nota.em ? br(nota.em) : '', nota.por || '']);
+    }
+  });
+  if (chaves.length === 0) linhas.push(['—', 'Nenhuma nota registrada', '', '', '', '', '']);
+
+  const ws = XLSX.utils.aoa_to_sheet(linhas);
+  ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: linhas.length - 1, c: cab.length - 1 } });
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: cab.length - 1 } },
+                   { s: { r: 1, c: 0 }, e: { r: 1, c: cab.length - 1 } }];
+  ws['!cols'] = [{ wch: 12 }, { wch: 20 }, { wch: 14 }, { wch: 34 }, { wch: 70 }, { wch: 14 }, { wch: 12 }];
+  ws['!rows'] = [{ hpt: 26 }, { hpt: 15 }, { hpt: 6 }, { hpt: 18 }];
+  for (let c = 0; c < cab.length; c++) {
+    xlsPinta(ws, 0, c, XLS_EST.titulo); xlsPinta(ws, 1, c, XLS_EST.sub); xlsPinta(ws, 3, c, XLS_EST.cab);
+  }
+  const estNota = { font: { sz: 10, color: { rgb: XLS_COR.tinta } }, border: XLS_BORDA,
+                    alignment: { horizontal: 'left', vertical: 'top', wrapText: true, indent: 1 } };
+  for (let r = 4; r < linhas.length; r++) {
+    for (let c = 0; c < cab.length; c++) xlsPinta(ws, r, c, c === 4 ? estNota : XLS_EST.texto);
+  }
+  return ws;
+}
+
+function abaLegenda() {
+  const cab = ['Sigla', 'Significado', 'Observação'];
+  const itens = [
+    ['M', 'Turno 06–14', 'Manhã'],
+    ['I', 'Turnos 08–17 e 10–18', 'AJU-3 e intermediário'],
+    ['T', 'Turno 14–22', 'Tarde'],
+    ['N', 'Turno 22–06', 'Madrugada'],
+    ['MPS', 'Comercial', 'Segunda a sexta'],
+    ['F', 'Folga', 'Folga do ciclo 6x3'],
+    ['TRN', 'Treinamento', 'Ausência programada'],
+    ['SBV', 'Monitoria / sobreaviso', 'Ausência programada'],
+    ['ACT', 'Folga ACT', 'Ausência programada'],
+    ['BH', 'Banco de horas', 'Ausência programada'],
+    ['FER', 'Férias', 'Ausência programada'],
+    ['ATS', 'Atestado', 'Ausência programada'],
+    ['*', 'Asterisco no dia da semana', 'Indica feriado nacional, estadual ou municipal'],
+  ];
+  const linhas = [['LEGENDA'], [xlsCarimbo()], [], cab].concat(itens);
+  const ws = XLSX.utils.aoa_to_sheet(linhas);
+  ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: linhas.length - 1, c: 2 } });
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: 2 } }];
+  ws['!cols'] = [{ wch: 9 }, { wch: 32 }, { wch: 46 }];
+  ws['!rows'] = [{ hpt: 26 }, { hpt: 15 }, { hpt: 6 }, { hpt: 18 }];
+  for (let c = 0; c < 3; c++) {
+    xlsPinta(ws, 0, c, XLS_EST.titulo); xlsPinta(ws, 1, c, XLS_EST.sub); xlsPinta(ws, 3, c, XLS_EST.cab);
+  }
+  const mapaTurno = { M: '06-14', I: '08-17', T: '14-22', N: '22-06', MPS: 'MPS', F: 'FOLGA',
+                      TRN: 'TREINAMENTO', SBV: 'SOBREAVISO', ACT: 'ACT', BH: 'BANCO_HORAS',
+                      FER: 'FERIAS', ATS: 'ATESTADO' };
+  itens.forEach((it, i) => {
+    const r = 4 + i;
+    xlsPinta(ws, r, 0, mapaTurno[it[0]] ? xlsCelTurno(mapaTurno[it[0]]) : XLS_EST.num);
+    xlsPinta(ws, r, 1, XLS_EST.texto);
+    xlsPinta(ws, r, 2, XLS_EST.texto);
+  });
+  return ws;
+}
+
 function exportarExcel() {
   const res = mesAtual(); if (!res) { aviso('Gere a escala primeiro.'); return; }
   if (typeof XLSX === 'undefined') {
-    const csv = matrizMes(res).map(l => l.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(';')).join('\n');
+    const csv = [[`ESCALA OPERACIONAL — ${MESES[res.mes - 1]}/${res.ano}`]]
+      .concat([['Turno'].concat(Array.from({ length: res.dias }, (_, i) => String(i + 1)))])
+      .concat(ORDEM_LINHAS.map(t => [ROTULO[t]].concat(
+        Array.from({ length: res.dias }, (_, i) => (res.escala[t][i + 1] || []).join(' ')))))
+      .map(l => l.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(';')).join('\n');
     baixar('\ufeff' + csv, `escala_${String(res.mes).padStart(2, '0')}_${res.ano}.csv`, 'text/csv;charset=utf-8');
     aviso('Excel indisponível offline — arquivo CSV gerado.');
     return;
   }
   const wb = XLSX.utils.book_new();
-  S.meses.forEach(m => {
-    const ws = XLSX.utils.aoa_to_sheet(matrizMes(m));
-    ws['!cols'] = [{ wch: 22 }].concat(Array.from({ length: m.dias }, () => ({ wch: 11 })));
-    XLSX.utils.book_append_sheet(wb, ws, `${String(m.mes).padStart(2, '0')}-${m.ano}`);
-  });
-  const wsOp = XLSX.utils.aoa_to_sheet(matrizOperador(res));
-  wsOp['!cols'] = [{ wch: 6 }, { wch: 34 }, { wch: 15 }, { wch: 11 }]
-    .concat(Array.from({ length: res.dias }, () => ({ wch: 4 })), [{ wch: 7 }, { wch: 11 }]);
-  XLSX.utils.book_append_sheet(wb, wsOp, 'Por operador');
-
-  const cad = [['CADASTRO'], ['Letra', 'Nome', 'Login', 'Principal', 'Secundário', 'Tipo', 'AJU especial', 'Sem madrugada']];
-  S.ops.forEach(o => cad.push([o.letra, o.nome, o.login || '', polo(o), o.secundario || '', o.tipo || '',
-                               o.aju_especial || 'Não', o.sem_madrugada ? 'Sim' : 'Não']));
-  const wsC = XLSX.utils.aoa_to_sheet(cad);
-  wsC['!cols'] = [{ wch: 6 }, { wch: 36 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 11 }, { wch: 13 }, { wch: 14 }];
-  XLSX.utils.book_append_sheet(wb, wsC, 'Operadores');
-
+  S.meses.forEach(m => XLSX.utils.book_append_sheet(wb, abaMes(m),
+    `${String(m.mes).padStart(2, '0')}-${m.ano}`));
+  XLSX.utils.book_append_sheet(wb, abaOperador(res), 'Por operador');
+  XLSX.utils.book_append_sheet(wb, abaCadastro(), 'Operadores');
+  XLSX.utils.book_append_sheet(wb, abaNotas(), 'Notas');
+  XLSX.utils.book_append_sheet(wb, abaLegenda(), 'Legenda');
   XLSX.writeFile(wb, `escala_coi_${String(res.mes).padStart(2, '0')}_${res.ano}.xlsx`);
-  aviso('Planilha gerada com todos os meses.');
+  aviso('Planilha formatada gerada com todos os meses.');
 }
 function baixar(conteudo, nome, tipo) {
   const b = new Blob([conteudo], { type: tipo });
@@ -3534,7 +4012,7 @@ function dadosDoProjeto() {
     versao: 1, ops: S.ops, metaM: S.metaM, metaT: S.metaT, metaN: S.metaN,
     minDiurno: S.minDiurno, mesIni: S.mesIni, nMeses: S.nMeses, compactaFolga: S.compactaFolga,
     manual: S.manual, estadoInicial: S.estadoInicial, idx: S.idx, turnosOcultos: Array.from(S.turnosOcultos),
-    atualizadoEm: S.atualizadoEm, atualizadoHora: S.atualizadoHora, atualizadoPor: S.atualizadoPor, corManual: S.corManual,
+    atualizadoEm: S.atualizadoEm, atualizadoHora: S.atualizadoHora, atualizadoPor: S.atualizadoPor, corManual: S.corManual, notas: S.notas,
     mesReferencia: S.mesReferencia, equilibrarFds: S.equilibrarFds, historico: S.historico,
     admins: carregarAdmins()
   };
@@ -3544,7 +4022,12 @@ function dadosDoProjeto() {
 function persistirBackup() {
   carimbarAtualizacao();
   const dados = dadosDoProjeto();
-  try { localStorage.setItem(CHAVE_BACKUP, JSON.stringify(dados)); return true; }
+  try {
+    localStorage.setItem(CHAVE_BACKUP, JSON.stringify(dados));
+    alteracoesPendentes = false;
+    atualizarAvisoPendencia();
+    return true;
+  }
   catch (e) { return false; }
 }
 async function salvarAlteracoes() {
@@ -3642,6 +4125,7 @@ function carregarProjeto(d) {
   S.atualizadoEm = d.atualizadoEm || S.atualizadoEm; S.atualizadoPor = d.atualizadoPor || S.atualizadoPor;
   S.atualizadoHora = d.atualizadoHora || null;
   S.corManual = d.corManual || {};
+  S.notas = d.notas || {};
   S.mesReferencia = d.mesReferencia || null;
   S.equilibrarFds = !!d.equilibrarFds;
   S.historico = d.historico || {};
@@ -4109,6 +4593,8 @@ async function publicarListaAdmins() {
 
 function aplicarModoEdicao() {
   limparHistoricoEdicao();
+  alteracoesPendentes = false;      // toda troca de modo começa com o estado limpo
+  atualizarAvisoPendencia();
   document.body.classList.toggle('modo-edicao', S.editando);
   $('#grupoAcoesEdicao').classList.toggle('esconde', !S.editando);
   $('#btAbrirEdicao').classList.toggle('esconde', S.editando);
@@ -4231,7 +4717,50 @@ function tentarTrocarSenha() {
   trocarAbaAdmin('entrar');
 }
 $('#btAbrirEdicao').onclick = abrirModalAdmin;
-$('#btSairEdicao').onclick = () => { S.editando = false; S.usuarioAtual = null; aplicarModoEdicao(); aviso('Você saiu do modo de edição.'); };
+window.addEventListener('beforeunload', e => {
+  if (!alteracoesPendentes || !S.editando) return;
+  e.preventDefault();
+  e.returnValue = '';   // o navegador mostra o aviso padrão de saída
+});
+
+function encerrarEdicao(msg) {
+  S.editando = false; S.usuarioAtual = null;
+  alteracoesPendentes = false;
+  aplicarModoEdicao();
+  atualizarAvisoPendencia();
+  aviso(msg || 'Você saiu do modo de edição.');
+}
+$('#btSairEdicao').onclick = () => {
+  if (!alteracoesPendentes) { encerrarEdicao(); return; }
+  const temBackup = (() => { try { return !!localStorage.getItem(CHAVE_BACKUP); } catch (e) { return false; } })();
+  $('#sairEdicaoSub').textContent = temBackup
+    ? 'Você fez alterações que ainda não foram salvas nem publicadas. Descartar volta tudo para a última versão salva.'
+    : 'Você fez alterações que ainda não foram salvas nem publicadas, e não existe versão salva neste navegador. Descartar encerra a edição mantendo a tela como está, mas nada será publicado.';
+  $('#modalSairEdicao').classList.remove('esconde');
+};
+function fecharModalSair() { $('#modalSairEdicao').classList.add('esconde'); }
+$('#sairCancelar').onclick = fecharModalSair;
+$('#modalSairEdicao').onclick = e => { if (e.target.id === 'modalSairEdicao') fecharModalSair(); };
+$('#sairSalvar').onclick = async () => {
+  fecharModalSair();
+  await salvarAlteracoes();
+  if (alteracoesPendentes) { aviso('Não consegui salvar — você continua no modo de edição.'); return; }
+  encerrarEdicao('Alterações salvas. Você saiu do modo de edição.');
+};
+$('#sairDescartar').onclick = () => {
+  fecharModalSair();
+  let bruto = null;
+  try { bruto = localStorage.getItem(CHAVE_BACKUP); } catch (e) { bruto = null; }
+  if (bruto) {
+    try {
+      carregarProjeto(JSON.parse(bruto));
+      sincronizar(); gerarTudo(); desenharTudo();
+      encerrarEdicao('Alterações descartadas. Voltamos para a última versão salva.');
+      return;
+    } catch (e) { /* backup ilegível: apenas encerra */ }
+  }
+  encerrarEdicao('Você saiu do modo de edição sem salvar.');
+};
 $('#loginCancelar').onclick = fecharModalAdmin;
 $('#modalAdmin').onclick = e => { if (e.target.id === 'modalAdmin') fecharModalAdmin(); };
 $('#tabEntrar').onclick = () => trocarAbaAdmin('entrar');
@@ -4501,21 +5030,255 @@ document.addEventListener('dblclick', e => {
     iniciarEdicaoInline(c);
   }
 });
+/* ═══════════════ menu do botão direito na grade ═══════════════ */
+function fecharMenuCtx() { $('#menuContexto').classList.add('esconde'); }
+function abrirMenuCtx(x, y, itens) {
+  const m = $('#menuContexto');
+  m.innerHTML = '';
+  itens.forEach(it => {
+    if (it.tipo === 'titulo') { m.appendChild(el('div', { class: 'ctx-titulo', text: it.texto })); return; }
+    if (it.tipo === 'sep') { m.appendChild(el('div', { class: 'ctx-sep' })); return; }
+    const b = el('button', { type: 'button', class: it.perigo ? 'perigo-item' : '' });
+    b.appendChild(el('span', { text: it.icone || '' }));
+    b.appendChild(document.createTextNode(it.texto));
+    b.onclick = ev => { ev.stopPropagation(); fecharMenuCtx(); it.acao(); };
+    m.appendChild(b);
+  });
+  m.classList.remove('esconde');
+  // reposiciona pra não vazar da janela
+  const r = m.getBoundingClientRect();
+  const px = Math.min(x, window.innerWidth - r.width - 8);
+  const py = Math.min(y, window.innerHeight - r.height - 8);
+  m.style.left = Math.max(8, px) + 'px';
+  m.style.top = Math.max(8, py) + 'px';
+}
+document.addEventListener('click', e => { if (!e.target.closest('#menuContexto')) fecharMenuCtx(); });
+window.addEventListener('scroll', fecharMenuCtx, true);
+window.addEventListener('resize', fecharMenuCtx);
+
 document.addEventListener('contextmenu', e => {
+  if (!S.editando) return;
+  const dentroTabela = e.target.closest('#tabelaEscala');
+  if (!dentroTabela) return;
+
   const span = e.target.closest('.letra');
-  if (!span || !span.closest('#tabelaEscala') || !S.editando) return;
+  const cel = e.target.closest('.cel');
+  const th = e.target.closest('th.dia');
+  if (!span && !cel && !th) return;
   e.preventDefault();
-  const chave = span.dataset.corKey || ''; // "ano-mes|turno|dia|letra"
-  const partes = chave.split('|');
-  const letra = partes[3] || span.textContent.trim();
-  let diaIso = null;
-  if (partes.length === 4) {
-    const [anoMes, , dia] = partes;
-    const [ano, mes] = anoMes.split('-').map(Number);
-    if (ano && mes && dia) diaIso = iso(ano, mes, Number(dia));
+
+  let ano = null, mes = null, dia = null, turno = null, letra = null;
+  if (span) {
+    const partes = (span.dataset.corKey || '').split('|');   // "ano-mes|turno|dia|letra"
+    if (partes.length === 4) {
+      [ano, mes] = partes[0].split('-').map(Number);
+      turno = partes[1]; dia = Number(partes[2]); letra = partes[3];
+    } else { letra = span.textContent.trim(); }
   }
-  abrirModalAus(letra, diaIso);
+  const base = cel || th;
+  if (ano === null && base) {
+    ano = Number(base.dataset.ano); mes = Number(base.dataset.mes); dia = Number(base.dataset.dia);
+    if (cel) turno = cel.dataset.turno;
+  }
+  if (!ano || !mes || !dia) return;
+
+  const diaIso = iso(ano, mes, dia);
+  // origem do clique define a pré-marcação: letra > turno (célula) > coluna (cabeçalho)
+  const naLetra = !!(span && letra && turno);
+  const noTurno = !naLetra && !!turno;
+  const alvo = { ano, mes, dia, turno, letra, naLetra, noTurno };
+  const chaveL = naLetra ? chaveNotaLetra(ano, mes, dia, turno, letra) : null;
+  const chaveT = turno ? chaveNotaTurno(ano, mes, dia, turno) : null;
+  const chaveC = chaveNotaColuna(ano, mes, dia);
+  const notaL = chaveL ? lerNota(chaveL) : null;
+  const notaT = chaveT ? lerNota(chaveT) : null;
+  const notaC = lerNota(chaveC);
+  const rotTurno = turno ? (ROTULO[turno] || turno) : '';
+
+  const itens = [];
+  itens.push({ tipo: 'titulo', texto: naLetra ? `${letra} · dia ${dia}` : (noTurno ? `${rotTurno} · dia ${dia}` : `Dia ${dia}`) });
+  const jaTem = naLetra ? notaL : (noTurno ? notaT : notaC);
+  itens.push({
+    icone: '📝', texto: jaTem ? 'Editar nota' : 'Inserir nota',
+    acao: () => abrirModalNota(alvo)
+  });
+  itens.push({ icone: '🗓', texto: 'Inserir ausência', acao: () => abrirModalAus(letra, diaIso) });
+  if (notaL || notaT || notaC) {
+    itens.push({ tipo: 'sep' });
+    if (notaL) itens.push({
+      icone: '🗑', perigo: true, texto: `Remover nota de ${letra}`,
+      acao: () => removerNota(chaveL, `Nota de ${letra} removida.`)
+    });
+    if (notaT) itens.push({
+      icone: '🗑', perigo: true, texto: `Remover nota de ${rotTurno}`,
+      acao: () => removerNota(chaveT, `Nota do turno ${rotTurno} removida.`)
+    });
+    if (notaC) itens.push({
+      icone: '🗑', perigo: true, texto: `Remover nota do dia ${dia}`,
+      acao: () => removerNota(chaveC, `Nota do dia ${dia} removida.`)
+    });
+  }
+  abrirMenuCtx(e.clientX, e.clientY, itens);
 });
+
+/* ═══════════════ modal de nota ═══════════════ */
+let notaAlvo = null;   // { ano, mes, dia, turno, letra, naLetra }
+
+function letrasDoDia(ano, mes, dia) {
+  const res = acharMes(ano, mes);
+  const achadas = [];
+  if (!res) return achadas;
+  ORDEM_LINHAS.forEach(t => {
+    ((res.escala[t] || {})[dia] || []).forEach(l => achadas.push({ letra: l, turno: t }));
+  });
+  return achadas;
+}
+function sincronizarEscolhaAlvo() {
+  const naLetra = $('#notaAlvoLetra').checked;
+  const noTurno = $('#notaAlvoTurno').checked;
+  // só perguntamos qual letra/turno quando a origem do clique não trouxe essa informação
+  $('#notaEscolhaLetra').classList.toggle('esconde', !(naLetra && !(notaAlvo && notaAlvo.naLetra)));
+  $('#notaEscolhaTurno').classList.toggle('esconde', !(noTurno && !(notaAlvo && notaAlvo.turno)));
+}
+function turnosDoDia(ano, mes, dia) {
+  const res = acharMes(ano, mes);
+  if (!res) return [];
+  return ORDEM_LINHAS.filter(t => (res.escala[t] || {})[dia] !== undefined)
+    .map(t => ({ turno: t, n: ((res.escala[t] || {})[dia] || []).length }));
+}
+function abrirModalNota(alvo) {
+  notaAlvo = alvo;
+  const chaveL = alvo.naLetra ? chaveNotaLetra(alvo.ano, alvo.mes, alvo.dia, alvo.turno, alvo.letra) : null;
+  const chaveT = alvo.turno ? chaveNotaTurno(alvo.ano, alvo.mes, alvo.dia, alvo.turno) : null;
+  const chaveC = chaveNotaColuna(alvo.ano, alvo.mes, alvo.dia);
+  const notaL = chaveL ? lerNota(chaveL) : null;
+  const notaT = chaveT ? lerNota(chaveT) : null;
+  const notaC = lerNota(chaveC);
+  const existente = alvo.naLetra ? notaL : (alvo.noTurno ? notaT : notaC);
+  const resMes = acharMes(alvo.ano, alvo.mes);
+  const poloAlvo = (alvo.naLetra && resMes) ? poloDoDia(resMes, alvo.dia, alvo.turno, alvo.letra) : '';
+  const rotTurno = alvo.turno ? (ROTULO[alvo.turno] || alvo.turno) : '';
+  const dataTxt = br(iso(alvo.ano, alvo.mes, alvo.dia));
+
+  // pré-marcação conforme a origem: letra, célula do turno ou cabeçalho do dia
+  $('#notaAlvoLetra').checked = !!alvo.naLetra;
+  $('#notaAlvoTurno').checked = !!alvo.noTurno;
+  $('#notaAlvoColuna').checked = !alvo.naLetra && !alvo.noTurno;
+
+  $('#notaSub').textContent = alvo.naLetra && poloAlvo
+    ? `${nomeDe(alvo.letra)} · ${dataTxt} · polo do dia ${poloAlvo}.`
+    : (alvo.noTurno ? `${rotTurno} · ${dataTxt}.`
+                    : 'A nota fica marcada com uma bandeirinha e aparece ao passar o mouse.');
+  $('#notaLetraAtual').textContent = alvo.naLetra
+    ? `(${alvo.letra} · ${rotTurno}${poloAlvo ? ' · ' + poloAlvo : ''})` : '';
+  $('#notaTurnoAtual').textContent = alvo.turno ? `(${rotTurno} · ${dataTxt})` : '';
+  $('#notaDiaAtual').textContent = `(${dataTxt})`;
+  $('#notaTitulo').textContent = existente ? 'Editar nota' : 'Inserir nota';
+  $('#notaTexto').value = existente ? existente.texto : '';
+  atualizarContadorNota();
+  $('#notaRemover').classList.toggle('esconde', !existente);
+
+  // letras do dia, caso o usuário troque o alvo para uma letra
+  const sel = $('#notaLetraSel'); sel.innerHTML = '';
+  const opcoes = letrasDoDia(alvo.ano, alvo.mes, alvo.dia);
+  if (!opcoes.length) sel.appendChild(el('option', { value: '', text: 'Nenhuma letra neste dia' }));
+  else {
+    sel.appendChild(el('option', { value: '', text: '— escolha a letra —' }));
+    opcoes.forEach(o => {
+      const p = resMes ? poloDoDia(resMes, alvo.dia, o.turno, o.letra) : '';
+      sel.appendChild(el('option', {
+        value: `${o.letra}|${o.turno}`,
+        text: `${o.letra} — ${(nomeDe(o.letra) || '').replace(/^\[[^\]]+\]\s*/, '')} · ${ROTULO[o.turno] || o.turno}${p ? ' · ' + p : ''}`
+      }));
+    });
+  }
+  // turnos do dia, caso o usuário troque o alvo para um turno
+  const selT = $('#notaTurnoSel'); selT.innerHTML = '';
+  const turnos = turnosDoDia(alvo.ano, alvo.mes, alvo.dia);
+  if (!turnos.length) selT.appendChild(el('option', { value: '', text: 'Nenhum turno neste dia' }));
+  else {
+    selT.appendChild(el('option', { value: '', text: '— escolha o turno —' }));
+    turnos.forEach(t => selT.appendChild(el('option', {
+      value: t.turno,
+      text: `${ROTULO[t.turno] || t.turno} — ${t.n} ${t.n === 1 ? 'operador' : 'operadores'}`
+    })));
+  }
+  sincronizarEscolhaAlvo();
+  $('#modalNota').classList.remove('esconde');
+  $('#notaTexto').focus();
+}
+function atualizarContadorNota() {
+  const n = $('#notaTexto').value.length;
+  const c = $('#notaContador');
+  c.textContent = `${n} / 500`;
+  c.style.color = n >= 500 ? 'var(--vermelho, #c0392b)' : 'var(--ink-3)';
+}
+function fecharNota() { $('#modalNota').classList.add('esconde'); notaAlvo = null; }
+function removerNota(chave, msg) {
+  if (!S.notas || !S.notas[chave]) return;
+  registrarPasso();
+  delete S.notas[chave];
+  desenharEscala(); carimbarAtualizacao();
+  aviso(msg || 'Nota removida.');
+}
+
+$('#notaTexto').oninput = atualizarContadorNota;
+$('#notaCancelar').onclick = fecharNota;
+$('#modalNota').onclick = e => { if (e.target.id === 'modalNota') fecharNota(); };
+// as três caixas são exclusivas: marcar uma desmarca as outras, e nunca ficam todas vazias
+function marcarAlvoNota(idEscolhido) {
+  const ids = ['notaAlvoLetra', 'notaAlvoTurno', 'notaAlvoColuna'];
+  const alvoValido = ids.some(i => $('#' + i).checked);
+  if (!alvoValido) { $('#' + idEscolhido).checked = true; return sincronizarEscolhaAlvo(); }
+  ids.forEach(i => { if (i !== idEscolhido) $('#' + i).checked = false; });
+  sincronizarEscolhaAlvo();
+}
+$('#notaAlvoLetra').onchange = () => marcarAlvoNota('notaAlvoLetra');
+$('#notaAlvoTurno').onchange = () => marcarAlvoNota('notaAlvoTurno');
+$('#notaAlvoColuna').onchange = () => marcarAlvoNota('notaAlvoColuna');
+function chaveNotaDoModal() {
+  if (!notaAlvo) return null;
+  const { ano, mes, dia } = notaAlvo;
+  if ($('#notaAlvoLetra').checked) {
+    let letra = notaAlvo.letra, turno = notaAlvo.turno;
+    if (!notaAlvo.naLetra) {                       // origem não era uma letra: precisa dizer qual
+      const escolha = $('#notaLetraSel').value;
+      if (!escolha) { aviso('Escolha em qual letra a nota vai ficar.'); $('#notaLetraSel').focus(); return null; }
+      [letra, turno] = escolha.split('|');
+    }
+    return chaveNotaLetra(ano, mes, dia, turno, letra);
+  }
+  if ($('#notaAlvoTurno').checked) {
+    let turno = notaAlvo.turno;
+    if (!turno) {                                  // veio do cabeçalho do dia: precisa dizer qual turno
+      turno = $('#notaTurnoSel').value;
+      if (!turno) { aviso('Escolha em qual turno a nota vai ficar.'); $('#notaTurnoSel').focus(); return null; }
+    }
+    return chaveNotaTurno(ano, mes, dia, turno);
+  }
+  return chaveNotaColuna(ano, mes, dia);
+}
+$('#notaRemover').onclick = () => {
+  const chave = chaveNotaDoModal();
+  if (!chave) return;
+  fecharNota();
+  removerNota(chave);
+};
+$('#notaSalvar').onclick = () => {
+  if (!notaAlvo) return;
+  const texto = $('#notaTexto').value.trim();
+  if (!texto) { aviso('Escreva o texto da nota antes de salvar.'); return; }
+  if (texto.length > 500) { aviso('A nota passa de 500 caracteres.'); return; }
+  const chave = chaveNotaDoModal();
+  if (!chave) return;
+
+  registrarPasso();
+  if (!S.notas) S.notas = {};
+  S.notas[chave] = { texto, em: paraIso(new Date()), por: S.usuarioAtual || '' };
+  fecharNota();
+  desenharEscala(); carimbarAtualizacao();
+  aviso('Nota salva.');
+};
 document.querySelectorAll('#paletaCores .cor-btn, #paletaCores .cor-limpar').forEach(btn => {
   btn.onclick = e => { e.stopPropagation(); aplicarCorManual(btn.dataset.cor || ''); };
 });
@@ -4539,6 +5302,9 @@ document.addEventListener('keydown', e => {
     if (e.key === 'Escape') { fecharModalAdmin(); return; }
     if (e.key === 'Enter') { e.preventDefault(); $('#loginConfirmar').click(); return; }
   }
+  if (!$('#modalSairEdicao').classList.contains('esconde') && e.key === 'Escape') { fecharModalSair(); return; }
+  if (!$('#menuContexto').classList.contains('esconde') && e.key === 'Escape') { fecharMenuCtx(); return; }
+  if (!$('#modalNota').classList.contains('esconde') && e.key === 'Escape') { fecharNota(); return; }
   if (!$('#modalAus').classList.contains('esconde') && e.key === 'Escape') { fecharAus(); return; }
   if (!$('#modalGerar').classList.contains('esconde') && e.key === 'Escape') { fecharModalGerar(); return; }
   if (!$('#painelFiltroTurnos').classList.contains('esconde') && e.key === 'Escape') { $('#painelFiltroTurnos').classList.add('esconde'); return; }
