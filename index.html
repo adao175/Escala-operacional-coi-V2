@@ -298,6 +298,11 @@ table.lista .cx{width:auto;min-width:0}
 .paleta-dica{font-size:10px;color:var(--ink-3);white-space:nowrap}
 .paleta-sep{width:1px;height:20px;background:var(--line-2);margin:0 2px;flex:0 0 auto}
 .opcao-ciclo{display:flex;align-items:center;gap:6px;height:34px;font-size:13px;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+/* logo: se a imagem não carregar, entra uma marca textual no lugar */
+.logo-texto{display:flex;flex-direction:column;justify-content:center;height:42px;line-height:1.05;
+  font-weight:800;font-size:21px;letter-spacing:.02em;color:#fff}
+.logo-texto span{font-size:9.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+  color:rgba(255,255,255,.62)}
 /* sinalização de alterações não salvas */
 #marcaPendente{display:inline-flex;align-items:center;gap:5px;margin-left:8px;font-size:11px;
   color:#f5a09b;font-weight:600}
@@ -404,7 +409,10 @@ body.foco-ativo{overflow:hidden}
 
 <header class="topo">
   <div class="marca">
-    <img src="https://binder.com.br/wp-content/uploads/2021/01/energisa.png" alt="Energisa" style="height:42px">
+    <img id="logoMarca" src="logo.svg" alt="Energisa" style="height:42px"
+         data-alt1="https://upload.wikimedia.org/wikipedia/commons/8/89/Energisa.svg"
+         data-alt2="logo.png">
+    <div id="logoTexto" class="logo-texto esconde">COI<span>Central de Operações</span></div>
     <div class="marca-sep"></div>
     <div class="marca-info">
       <div class="l1"><span id="marcaAtualizado">Atualizado em: —</span><span id="marcaPendente" class="esconde">não salvo</span></div>
@@ -4717,6 +4725,22 @@ function tentarTrocarSenha() {
   trocarAbaAdmin('entrar');
 }
 $('#btAbrirEdicao').onclick = abrirModalAdmin;
+/* ═══════════════ logo com fallback ═══════════════
+   Ordem: logo.svg local → SVG do Wikimedia → logo.png local → marca textual.
+   O arquivo local vem primeiro porque não depende de rede nem de terceiros; o
+   Wikimedia entra como rede de segurança enquanto o arquivo não for hospedado. */
+(function prepararLogo() {
+  const img = $('#logoMarca'); if (!img) return;
+  const alternativas = [img.dataset.alt1, img.dataset.alt2].filter(Boolean);
+  let i = 0;
+  img.onerror = () => {
+    if (i < alternativas.length) { img.src = alternativas[i++]; return; }
+    img.classList.add('esconde');
+    $('#logoTexto').classList.remove('esconde');
+  };
+  if (img.complete && img.naturalWidth === 0) img.onerror();
+})();
+
 window.addEventListener('beforeunload', e => {
   if (!alteracoesPendentes || !S.editando) return;
   e.preventDefault();
