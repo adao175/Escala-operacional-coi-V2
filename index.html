@@ -423,6 +423,7 @@ body.foco-ativo{overflow:hidden}
   <div class="navmes">
     <button id="btAnt" title="Mês anterior">&lsaquo;</button>
     <span class="rotulo" id="rotuloMes">—</span>
+    <button id="btMesExterno" type="button" class="esconde" style="border:1px solid var(--linha);background:transparent;color:var(--ink-3);border-radius:999px;padding:1px 8px;font-size:10.5px;letter-spacing:.4px;text-transform:uppercase;cursor:pointer">de fora</button>
     <button id="btProx" title="Próximo mês">&rsaquo;</button>
   </div>
   <div class="acoes">
@@ -433,6 +434,7 @@ body.foco-ativo{overflow:hidden}
         <button class="bt fantasma" id="btTools" aria-haspopup="true" aria-expanded="false">Tools <span class="dropdown-seta">▾</span></button>
         <div class="dropdown-menu esconde" id="menuTools" role="menu">
           <button id="btAbrir" role="menuitem" title="Mistura os meses no histórico (Por operador, exportações). Não muda o ponto de partida da geração — para isso, use Gerar escala → Carregar escala existente.">Importar p/ histórico</button>
+          <button id="btRessincronizar" role="menuitem" title="Reaplica o cadastro atual (ausências e edições manuais) em TODOS os meses guardados — inclusive o mês de referência e os meses importados de fora — sem regerar o rodízio.">Atualizar meses com o cadastro</button>
           <button id="btExcel" role="menuitem">Exportar Excel</button>
           <button id="btImprimir" role="menuitem">Imprimir</button>
           <button id="btSalvar" role="menuitem">Salvar arquivo</button>
@@ -2449,6 +2451,97 @@ function aplicarManuais(res) {
   }
 }
 
+/* ── Reaplicar o cadastro em meses que já existem (inclusive os de fora) ──
+   Todo mês guarda em `base` a grade como ela saiu do gerador (ou do arquivo
+   importado), ANTES das ausências e das edições manuais. Com isso dá pra
+   reaplicar o cadastro atual quantas vezes for preciso — inclusive desfazer
+   uma ausência que foi apagada — sem regerar o mês do zero. É o que faz o
+   mês de referência e os meses importados finalmente acompanharem as
+   mudanças de cadastro. */
+function normalizarEscala(res) {
+  if (!res || !res.escala) return res;
+  ORDEM_LINHAS.forEach(t => {
+    if (!res.escala[t]) res.escala[t] = {};
+    for (let d = 1; d <= res.dias; d++) if (!Array.isArray(res.escala[t][d])) res.escala[t][d] = [];
+  });
+  if (!res.overtime) res.overtime = {};
+  if (!res.info) res.info = {};
+  return res;
+}
+function garantirBase(res) {
+  if (res && res.escala && !res.base) res.base = clonar(res.escala);
+  return res;
+}
+function ehMesExterno(res) { return !!(res && res.externo); }
+function ressincronizarMes(res) {
+  if (!res || !res.escala) return;
+  normalizarEscala(res);
+  garantirBase(res);
+  res.escala = clonar(res.base);
+  normalizarEscala(res);
+  aplicarAusencias(res, S.ops);
+  aplicarManuais(res);
+}
+/* Depois de qualquer clonagem em bloco (carregar projeto, desfazer/refazer)
+   os objetos de S.meses e S.mesReferencia viram cópias soltas do histórico.
+   Isso religa tudo no MESMO objeto — senão uma edição feita na aba do mês de
+   referência não chegava ao histórico e sumia na geração seguinte. */
+function religarReferencias() {
+  if (S.mesReferencia && S.mesReferencia.ano && S.mesReferencia.mes) {
+    const chaveRef = chaveMes(S.mesReferencia.ano, S.mesReferencia.mes);
+    if (S.historico[chaveRef]) S.mesReferencia = S.historico[chaveRef];
+    else S.historico[chaveRef] = S.mesReferencia;
+    S.mesReferencia.externo = true;
+  }
+  S.meses = historicoOrdenado();
+}
+/* Trocar a letra de um operador no cadastro precisa arrastar junto tudo que
+   já foi escrito com a letra antiga — senão o operador "sumia" da grade dos
+   meses que já existiam e virava uma letra órfã. */
+function renomearLetra(antes, depois) {
+  if (!antes || !depois || antes === depois) return 0;
+  let trocas = 0;
+  const trocarLista = arr => {
+    if (!Array.isArray(arr)) return;
+    arr.forEach((l, i) => { if (l === antes) { arr[i] = depois; trocas++; } });
+  };
+  const varrerGrade = grade => {
+    if (!grade) return;
+    Object.keys(grade).forEach(t => {
+      const linha = grade[t];
+      if (linha) Object.keys(linha).forEach(d => trocarLista(linha[d]));
+    });
+  };
+  Object.values(S.historico).forEach(res => {
+    if (!res) return;
+    varrerGrade(res.escala);
+    varrerGrade(res.base);
+    varrerGrade(res.overtime);
+    if (res.estados && res.estados[antes] && !res.estados[depois]) {
+      res.estados[depois] = res.estados[antes]; delete res.estados[antes];
+    }
+  });
+  Object.keys(S.manual).forEach(k => trocarLista(S.manual[k]));
+  if (S.estadoInicial && S.estadoInicial[antes] && !S.estadoInicial[depois]) {
+    S.estadoInicial[depois] = S.estadoInicial[antes]; delete S.estadoInicial[antes];
+  }
+  // chaves que terminam na letra: corManual "ano-mes|turno|dia|letra" e nota "L:...|letra"
+  const migrarChaves = obj => {
+    if (!obj) return;
+    Object.keys(obj).forEach(k => {
+      const p = k.split('|');
+      if (p[p.length - 1] === antes) { p[p.length - 1] = depois; obj[p.join('|')] = obj[k]; delete obj[k]; }
+    });
+  };
+  migrarChaves(S.corManual); migrarChaves(S.notas);
+  return trocas;
+}
+function ressincronizarTodosOsMeses() {
+  religarReferencias();
+  Object.keys(S.historico).forEach(c => ressincronizarMes(S.historico[c]));
+  S.meses = historicoOrdenado();
+}
+
 /* ═══════════════ geração de vários meses ═══════════════ */
 function limparAusenciasVencidas() {
   const hoje = paraIso(new Date());
@@ -2494,17 +2587,34 @@ function gerarTudo(travarPassado) {
   // turno real (então não afeta a segurança das 12h no 1º dia gerado).
   if (S.equilibrarFds) estados = aplicarEquilibrioFds(estados, S.ops, a0, m0);
   const meses = [];
-  if (S.mesReferencia) meses.push(S.mesReferencia); // mês carregado de fora entra fixo como a 1ª aba
+  if (S.mesReferencia) { S.mesReferencia.externo = true; meses.push(S.mesReferencia); } // mês carregado de fora entra fixo como a 1ª aba
   let a = a0, m = m0;
   for (let i = 0; i < S.nMeses; i++) {
-    const res = gerarMes(S.ops, a, m, estados);
-    estados = res.estados;
-    aplicarAusencias(res, S.ops);
-    aplicarManuais(res);
-    meses.push(res);
+    const chaveAtual = chaveMes(a, m);
+    const existente = S.historico[chaveAtual];
+    if (ehMesExterno(existente) && existente !== S.mesReferencia) {
+      // Mês veio de fora (importado / carregado de outro arquivo): NÃO regera
+      // por cima, senão a escala importada seria jogada fora. Só reaplica o
+      // cadastro atual (ausências + edições manuais) e continua o rodízio a
+      // partir do que está de fato nele.
+      ressincronizarMes(existente);
+      estados = garantirEstados(inferirEstadosDeEscala(existente, S.ops), S.ops);
+      meses.push(existente);
+    } else {
+      const res = gerarMes(S.ops, a, m, estados);
+      estados = res.estados;
+      garantirBase(res);              // grade "limpa", antes de ausência/manual
+      aplicarAusencias(res, S.ops);
+      aplicarManuais(res);
+      meses.push(res);
+    }
     [a, m] = proximoMes(a, m);
   }
   meses.forEach(m2 => { if (m2 && m2.ano && m2.mes) S.historico[chaveMes(m2.ano, m2.mes)] = m2; });
+  // Reaplica o cadastro atual em TODOS os meses guardados — inclusive o mês de
+  // referência e os meses que estão fora da janela de geração, que antes
+  // ficavam congelados e nunca acompanhavam mudança de ausência/edição.
+  ressincronizarTodosOsMeses();
   // a janela navegável passa a ser TODA a linha do tempo já gerada — meses
   // anteriores continuam ali, a menos que este lote tenha regenerado o mesmo mês.
   S.meses = historicoOrdenado();
@@ -2585,6 +2695,18 @@ function desenharEscala() {
     $('#rotuloMes').textContent = `${String(atual.mes).padStart(2, '0')}/${atual.ano}`;
   } else {
     $('#rotuloMes').textContent = '—';
+  }
+  const tagExt = $('#btMesExterno');
+  if (tagExt) {
+    if (atual && atual.externo) {
+      tagExt.classList.remove('esconde');
+      tagExt.disabled = !S.editando;
+      tagExt.title = S.editando
+        ? 'Mês carregado de um arquivo externo: a geração não escreve por cima dele, só reaplica ausências e edições manuais. Clique para liberar a regeração deste mês.'
+        : 'Mês carregado de um arquivo externo.';
+    } else {
+      tagExt.classList.add('esconde');
+    }
   }
   $('#btAnt').disabled = S.idx <= 0;
   $('#btProx').disabled = S.idx >= S.meses.length - 1;
@@ -2913,9 +3035,29 @@ function desenharCadastro() {
 
     const iLetra = el('input', { value: o.letra, style: 'width:46px;text-align:center;font-family:var(--mono);font-weight:700' });
     iLetra.disabled = !S.editando;
+    let letraAntes = o.letra;
+    iLetra.onfocus = () => { letraAntes = o.letra; };
     iLetra.oninput = () => { o.letra = iLetra.value.toUpperCase().slice(0, 2); };
+    iLetra.onchange = () => {
+      const nova = (iLetra.value || '').toUpperCase().slice(0, 2).trim();
+      if (!nova) { o.letra = letraAntes; iLetra.value = letraAntes; return; }
+      if (nova === letraAntes) { o.letra = nova; return; }
+      if (S.ops.some(x => x !== o && x.letra === nova)) {
+        aviso(`Já existe outro operador com a letra ${nova}.`);
+        o.letra = letraAntes; iLetra.value = letraAntes; return;
+      }
+      registrarPasso();
+      o.letra = nova;
+      const trocas = renomearLetra(letraAntes, nova);
+      letraAntes = nova;
+      desenharEscala(); desenharOperador(); desenharAusencias(); desenharPainel();
+      carimbarAtualizacao();
+      if (trocas) aviso(`Letra trocada em ${trocas} lançamento(s) já existentes da escala.`);
+    };
     add(iLetra);
-    add(campo('nome', '230px'));
+    const iNome = campo('nome', '230px');
+    iNome.onchange = () => { desenharEscala(); desenharOperador(); desenharPainel(); carimbarAtualizacao(); };
+    add(iNome);
     add(campo('login', '80px'));
     add(sel('principal', POLOS.map(p => [p, p])));
     add(sel('secundario', POLOS.map(p => [p, p])));
@@ -3562,6 +3704,7 @@ function fotoEstado() {
 }
 function aplicarFoto(f) {
   CAMPOS_HISTORICO.forEach(k => { if (k in f) S[k] = clonar(f[k]); });
+  religarReferencias(); // sem isso, S.meses/S.mesReferencia viram cópias soltas do histórico
   if (S.idx >= S.meses.length) S.idx = Math.max(0, S.meses.length - 1);
   selecionarSpanCor(null);
   desenharEscala(); desenharOperador(); desenharCadastro(); desenharAusencias(); desenharPainel();
@@ -4138,6 +4281,9 @@ function carregarProjeto(d) {
   S.equilibrarFds = !!d.equilibrarFds;
   S.historico = d.historico || {};
   if (Array.isArray(d.admins)) mesclarAdmins(d.admins);
+  // o mês de referência e a cópia dele dentro do histórico chegam como dois
+  // objetos separados depois do JSON — religa nos dois sentidos
+  religarReferencias();
 }
 function abrir(arquivo) {
   const fr = new FileReader();
@@ -4150,7 +4296,7 @@ function abrir(arquivo) {
         aviso(`Cadastro importado: ${S.ops.length} operadores.`);
       } else if (ehFormatoCallback(d)) {          // mês avulso gerado fora do app
         S.mesReferencia = { ano: d.ano, mes: d.mes, dias: d.dias || diasNoMes(d.ano, d.mes),
-          escala: d.escala, overtime: d.overtime || {}, info: d.info_dias || {} };
+          escala: d.escala, overtime: d.overtime || {}, info: d.info_dias || {}, externo: true };
         S.estadoInicial = inferirEstadosDeEscala(S.mesReferencia, S.ops);
         const [prAno, prMes] = proximoMes(d.ano, d.mes);
         S.mesIni = prAno + '-' + String(prMes).padStart(2, '0');
@@ -4310,6 +4456,10 @@ $('#btConfirmarImportar').onclick = () => {
   marcados.forEach(idx => {
     const cand = candidatosImportarAtual[idx];
     if (!cand) return;
+    // marca como "veio de fora": a geração não escreve por cima dele, só
+    // reaplica ausências/edições em cima da grade importada
+    cand.dados.externo = true;
+    delete cand.dados.base;
     S.historico[cand.chave] = cand.dados;
     Object.assign(S.manual, cand.manualFiltrado);
     Object.assign(S.corManual, cand.corManualFiltrado);
@@ -4885,6 +5035,19 @@ $('#btSalvarOps').onclick = () => {
 $('#abasModal').onclick = e => { const b = e.target.closest('.aba'); if (b) irParaModal(b.dataset.alvo); };
 $('#btFecharGerar').onclick = fecharModalGerar;
 $('#modalGerar').onclick = e => { if (e.target.id === 'modalGerar') fecharModalGerar(); };
+$('#btMesExterno').onclick = () => {
+  if (!S.editando) return;
+  const atual = mesAtual();
+  if (!atual || !atual.externo) return;
+  if (!confirm(`Liberar ${MESES[atual.mes - 1]} de ${atual.ano} para ser regerado?\n\nA grade que veio do arquivo externo será substituída pela gerada pelo rodízio (as edições manuais e as ausências continuam sendo aplicadas por cima).`)) return;
+  registrarPasso();
+  delete atual.externo;
+  delete atual.base;
+  if (S.mesReferencia && S.mesReferencia === atual) S.mesReferencia = null;
+  gerarTudo(false);
+  carimbarAtualizacao();
+  aviso('Mês liberado e regerado.');
+};
 $('#btAnt').onclick = () => { if (S.idx > 0) { S.idx--; desenharTudo(); } };
 $('#btProx').onclick = () => { if (S.idx < S.meses.length - 1) { S.idx++; desenharTudo(); } };
 $('#fMesIni').onchange = e => { S.mesIni = e.target.value; S.idx = 0; gerarTudo(); };
@@ -4904,6 +5067,15 @@ $('#fMesmaLetra').onchange = e => { S.agruparCiclo = e.target.checked; desenharO
 $('#btRestaurarBackup').onclick = restaurarBackup;
 $('#btDesfazer').onclick = e => { e.stopPropagation(); desfazerPasso(); };
 $('#btRefazer').onclick = e => { e.stopPropagation(); refazerPasso(); };
+$('#btRessincronizar').onclick = () => {
+  fecharMenuTools();
+  if (!S.meses.length) { aviso('Não há nenhum mês guardado ainda.'); return; }
+  registrarPasso();
+  ressincronizarTodosOsMeses();
+  desenharTudo();
+  carimbarAtualizacao();
+  aviso(`Cadastro reaplicado em ${S.meses.length} mês(es), sem regerar o rodízio.`);
+};
 $('#btExcel').onclick = () => { fecharMenuTools(); exportarExcel(); };
 $('#btImprimir').onclick = () => { fecharMenuTools(); window.print(); };
 $('#btAbrir').onclick = () => { fecharMenuTools(); $('#arquivoJson').click(); };
