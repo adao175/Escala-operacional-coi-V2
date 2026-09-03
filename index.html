@@ -2473,12 +2473,38 @@ function garantirBase(res) {
   return res;
 }
 function ehMesExterno(res) { return !!(res && res.externo); }
+/* Posições fixas de cadastro — MPS e Aracaju-3. Não dependem do rodízio 6x3:
+   são regra direta do dia (MPS = comercial em dia útil, folga em fds/feriado;
+   Aracaju-3 = 08-17 de segunda a sexta). Por isso dá pra reaplicá-las mesmo em
+   meses que nunca são regerados (mês de referência, meses importados) —
+   mudar alguém pra MPS no cadastro tira ele dos turnos e põe na linha MPS
+   também nesses meses. Quem volta de MPS pro rodízio reaparece na posição que
+   estava em `base`. */
+function aplicarFixosDeCadastro(res, ops) {
+  const { ano, mes, dias, escala } = res;
+  const { mps, fixos3 } = classificar(ops);
+  if (!mps.length && !fixos3.length) return;
+  const mover = (letra, d, destino) => {
+    ORDEM_LINHAS.forEach(t => {
+      if (t === destino || !escala[t]) return;
+      const i = (escala[t][d] || []).indexOf(letra);
+      if (i >= 0) escala[t][d].splice(i, 1);
+    });
+    if (!escala[destino][d]) escala[destino][d] = [];
+    if (escala[destino][d].indexOf(letra) < 0) escala[destino][d].push(letra);
+  };
+  for (let d = 1; d <= dias; d++) {
+    mps.forEach(o => mover(o.letra, d, ehDiaUtil(ano, mes, d) ? 'MPS' : 'FOLGA'));
+    fixos3.forEach(o => mover(o.letra, d, !ehFds(ano, mes, d) ? '08-17' : 'FOLGA'));
+  }
+}
 function ressincronizarMes(res) {
   if (!res || !res.escala) return;
   normalizarEscala(res);
   garantirBase(res);
   res.escala = clonar(res.base);
   normalizarEscala(res);
+  aplicarFixosDeCadastro(res, S.ops);
   aplicarAusencias(res, S.ops);
   aplicarManuais(res);
 }
@@ -3020,6 +3046,10 @@ function desenharCadastro() {
         s.appendChild(op2);
       });
       s.onchange = () => {
+        // polo, tipo e "AJU especial" mudam ONDE a pessoa fica na grade, não só
+        // a geração futura — então reaplica nos meses que já existem
+        const estrutural = ['principal', 'secundario', 'tipo', 'aju_especial'].indexOf(prop) >= 0;
+        if (estrutural) registrarPasso();
         o[prop] = s.value;
         // Se a prioridade daquele polo ainda estiver no padrão "sem definir"
         // (99), acompanha a troca de polo sugerindo a próxima da sequência.
@@ -3029,6 +3059,15 @@ function desenharCadastro() {
           o.prioridade_polo_secundario = proximaPrioridadePolo('prioridade_polo_secundario', s.value);
         }
         desenharCadastro();
+        if (estrutural) {
+          ressincronizarTodosOsMeses();
+          desenharEscala(); desenharOperador(); desenharPainel();
+          carimbarAtualizacao();
+          const fixo = o.tipo === 'MPS' || polo(o) === 'MPS' || polo(o) === 'Aracaju - 3';
+          aviso(fixo
+            ? `${o.nome || o.letra} reposicionado em todos os meses guardados. Use "Gerar escala" pra redistribuir o rodízio de quem ficou.`
+            : 'Cadastro atualizado. Use "Gerar escala" pra recalcular o rodízio.');
+        }
       };
       return s;
     };
