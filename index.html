@@ -2457,14 +2457,18 @@ function aplicarManuais(res) {
      folga + turno continua valendo como hora extra, igual ao editor. */
   Object.keys(travadas).forEach(ds => {
     const d = Number(ds), trav = travadas[d];
-    const aMao = new Set();
-    trav.forEach(t => { if (t !== 'FOLGA') (res.escala[t][d] || []).forEach(l => aMao.add(l)); });
-    if (!aMao.size) return;
+    const aMao = new Set(), folgaAMao = new Set();
+    trav.forEach(t => (res.escala[t][d] || []).forEach(l => (t === 'FOLGA' ? folgaAMao : aMao).add(l)));
+    if (!aMao.size && !folgaAMao.size) return;
     ORDEM_LINHAS.forEach(t => {
-      if (t === 'FOLGA' || trav.has(t) || !res.escala[t] || !Array.isArray(res.escala[t][d])) return;
-      res.escala[t][d] = res.escala[t][d].filter(l => !aMao.has(l));
+      if (trav.has(t) || !res.escala[t] || !Array.isArray(res.escala[t][d])) return;
+      // quem está numa célula de trabalho travada sai das outras (menos da folga:
+      // folga + turno = hora extra, como no editor); quem está numa FOLGA travada
+      // sai dos turnos não travados — senão ficava de folga e trabalhando
+      const tirar = l => (t !== 'FOLGA' && aMao.has(l)) || (t !== 'FOLGA' && folgaAMao.has(l) && !aMao.has(l));
+      res.escala[t][d] = res.escala[t][d].filter(l => !tirar(l));
       const ot = (res.overtime && res.overtime[t]) ? res.overtime[t][d] : null;
-      if (Array.isArray(ot)) res.overtime[t][d] = ot.filter(l => !aMao.has(l));
+      if (Array.isArray(ot)) res.overtime[t][d] = ot.filter(l => !tirar(l));
     });
   });
 }
@@ -2516,20 +2520,20 @@ function aplicarFixosDeCadastro(res, ops) {
     fixos3.forEach(o => mover(o.letra, d, !ehFds(ano, mes, d) ? '08-17' : 'FOLGA'));
   }
 }
-/* Operador que precisa entrar no rodízio num mês que veio de fora (mês de
-   referência / importado). Esses meses nunca são regerados, então dois casos
-   ficavam sem 6x3 nenhum:
-     - operador novo, que não existia no arquivo;
-     - operador que era fixo (MPS / Aracaju-3) e passou pra um polo de rodízio
-       — ele continuava só na linha fixa que veio do arquivo, ou sumia.
-   Aqui ele é encaixado na `base` do mês (a grade "limpa"), só de HOJE pra
-   frente — dias que já passaram não mudam. Entra no ciclo 6x3 na posição com
-   menos gente (desempate: menos gente do mesmo polo) e, em cada bloco de
-   trabalho, no turno diurno (06-14 ou 14-22) mais vazio, respeitando as 12h
-   de descanso. Madrugada não é atribuída aqui. A posição escolhida fica
-   guardada em `cicloEncaixe`, pro mês seguinte continuar exatamente dali.
-   Como fica gravado na base, das próximas vezes ele já está no rodízio e não é
-   encaixado de novo; ausências e edições manuais continuam valendo por cima. */
+/* Mês que veio de fora (mês de referência / importado) não é regerado. A grade
+   do arquivo fica guardada em `baseArquivo` e NUNCA é alterada; a `base` do mês
+   é recomposta a partir dela toda vez, mexendo SÓ em quem tem uma entrada no
+   rodízio registrada (`reposicao` no cadastro):
+     - operador que trocou de polo/função e saiu de posição fixa (MPS,
+       Aracaju-3) pra um polo de rodízio — registrado na hora da troca;
+     - operador novo, que não existe no arquivo — registrado na 1ª vez que
+       aparece aqui, a partir de hoje.
+   A partir da data registrada ele sai de onde estava no arquivo e entra no 6x3
+   na posição calculada (dias que já tinha trabalhado seguidos, ou a posição
+   com menos gente se não tiver histórico). Em cada bloco fica no turno diurno
+   com menos gente; se o turno já estiver com a meta (8) completa, ele vai pro
+   10-18 naquele dia, sempre respeitando as 12h de descanso. Madrugada não é
+   atribuída aqui. Todo o resto do arquivo fica exatamente como veio. */
 function letrasNaGrade(grade) {
   const s = new Set();
   if (!grade) return s;
@@ -2539,48 +2543,44 @@ function letrasNaGrade(grade) {
   });
   return s;
 }
-const LINHAS_FIXAS = new Set(['MPS', '08-17']);
-function encaixarNovosNoMes(res, ops) {
-  if (!res || !res.base) return [];
-  const hj = hojeInfo();
-  if (res.ano < hj.ano || (res.ano === hj.ano && res.mes < hj.mes)) return []; // mês passado: não mexe
-  const inicio = (res.ano === hj.ano && res.mes === hj.mes) ? hj.dia : 1;
-  const dias = res.dias, base = res.base;
-  if (inicio > dias) return [];
-
-  // De `inicio` em diante, quem aparece em turno de rodízio já está no 6x3.
-  // Precisa de encaixe quem não aparece em lugar nenhum (operador novo) ou só
-  // aparece em linha fixa (MPS / 08-17) e folga — ex.: era MPS no arquivo.
-  // Quem só tem folga/ausência nesse trecho (fim de mês de folga, férias) é
-  // deixado como está.
-  const TURNOS_ROD = ['06-14', '10-18', '14-22', '22-06'];
-  const emTurnoRod = new Set(), emFixa = new Set(), emQualquer = new Set();
-  Object.keys(base).forEach(t => {
-    if (!base[t]) return;
-    for (let d = inicio; d <= dias; d++) (base[t][d] || []).forEach(l => {
-      emQualquer.add(l);
-      if (TURNOS_ROD.indexOf(t) >= 0) emTurnoRod.add(l);
-      if (LINHAS_FIXAS.has(t)) emFixa.add(l);
-    });
+function recomporBaseExterna(res, ops) {
+  if (!res || !res.base) return;
+  if (!res.baseArquivo) res.baseArquivo = clonar(res.base);
+  const base = clonar(res.baseArquivo);
+  const dias = res.dias;
+  ORDEM_LINHAS.forEach(t => {
+    if (!base[t]) base[t] = {};
+    for (let d = 1; d <= dias; d++) if (!Array.isArray(base[t][d])) base[t][d] = [];
   });
+  res.base = base;
+  res.cicloEncaixe = {};
+  delete res.reposAplicada; // campo da versão anterior
+
+  const iniMesIso = iso(res.ano, res.mes, 1), fimIso = iso(res.ano, res.mes, dias);
+  const hoje = paraIso(new Date());
+  const noArquivo = letrasNaGrade(res.baseArquivo);
   const { todosRot } = classificar(ops);
   const usoLetra = {}; ops.forEach(o => usoLetra[o.letra] = (usoLetra[o.letra] || 0) + 1);
-  if (!res.reposAplicada) res.reposAplicada = {};
-  const fimIso = iso(res.ano, res.mes, dias);
-  // letra repetida no cadastro (ex.: dois "?" recém-criados) fica de fora até ser definida
-  const novos = todosRot.filter(o => {
-    if (!o.letra || usoLetra[o.letra] !== 1) return false;
-    const r = o.reposicao;
-    // trocou de polo (saiu de posição fixa): reorganiza uma vez por troca
-    if (r && r.data <= fimIso && res.reposAplicada[o.letra] !== r.data) return true;
-    return !emTurnoRod.has(o.letra) && (emFixa.has(o.letra) || !emQualquer.has(o.letra));
-  });
-  if (!novos.length) return [];
-  const setNovos = new Set(novos.map(o => o.letra));
+  const unica = o => o.letra && usoLetra[o.letra] === 1; // ex.: dois "?" recém-criados ficam de fora
 
-  // posição no ciclo (relativa ao dia 1 deste mês) de quem já está no rodízio
+  // operador novo (não está no arquivo): entra a partir de hoje
+  todosRot.forEach(o => {
+    if (unica(o) && !o.reposicao && !noArquivo.has(o.letra) && fimIso >= hoje) {
+      o.reposicao = { data: hoje > iniMesIso ? hoje : iniMesIso, pos: null };
+    }
+  });
+  const alvo = todosRot.filter(o => {
+    const r = o.reposicao;
+    if (!unica(o) || !r || r.data > fimIso) return false;
+    // troca feita antes deste mês: só mexe se ele nem está no arquivo
+    return r.data >= iniMesIso || !noArquivo.has(o.letra);
+  });
+  if (!alvo.length) return;
+  const setAlvo = new Set(alvo.map(o => o.letra));
+
+  // posição no ciclo (relativa ao dia 1) de quem já está no rodízio, pra equilibrar
   const inferidos = inferirEstadosDeEscala({ ano: res.ano, mes: res.mes, dias, escala: base },
-                                           ops.filter(o => emQualquer.has(o.letra) && !setNovos.has(o.letra)));
+                                           ops.filter(o => noArquivo.has(o.letra) && !setAlvo.has(o.letra)));
   const vazio = () => new Array(9).fill(0);
   const cont = vazio(), contPolo = {};
   todosRot.forEach(o => {
@@ -2589,63 +2589,69 @@ function encaixarNovosNoMes(res, ops) {
     cont[ini]++;
     (contPolo[polo(o)] = contPolo[polo(o)] || vazio())[ini]++;
   });
-  const celula = (t, d) => {
-    if (!base[t]) base[t] = {};
-    if (!Array.isArray(base[t][d])) base[t][d] = [];
-    return base[t][d];
-  };
-  if (!res.cicloEncaixe) res.cicloEncaixe = {};
+  const meta = { '06-14': Number(S.metaM) || 8, '14-22': Number(S.metaT) || 8 };
+  const qtd = (t, d) => base[t][d].length;
 
-  novos.forEach(o => {
-    const l = o.letra;
-    // tira o que tinha sobrado dele de hoje em diante (ex.: linha MPS do arquivo)
+  alvo.forEach(o => {
+    const l = o.letra, r = o.reposicao;
+    const inicio = r.data >= iniMesIso ? Number(r.data.slice(8, 10)) : 1;
+    // a partir daqui ele sai de onde estava no arquivo
     Object.keys(base).forEach(t => {
-      if (!base[t]) return;
       for (let d = inicio; d <= dias; d++) {
         if (Array.isArray(base[t][d])) base[t][d] = base[t][d].filter(x => x !== l);
       }
     });
     const cp = contPolo[polo(o)] = contPolo[polo(o)] || vazio();
-    const r = o.reposicao;
-    let ini = 0;
-    if (r && r.pos != null && r.data <= fimIso) {
-      // posição vem dos dias que ele já trabalhou antes da troca (sem estourar 6 seguidos)
+    let ini;
+    if (r.pos != null) {
       const posNoInicio = (((r.pos + diasEntreIso(r.data, iso(res.ano, res.mes, inicio))) % 9) + 9) % 9;
       ini = (((posNoInicio - (inicio - 1)) % 9) + 9) % 9;
     } else {
+      ini = 0;
       for (let p = 1; p < 9; p++) {
         if (cont[p] < cont[ini] || (cont[p] === cont[ini] && cp[p] < cp[ini])) ini = p;
       }
+      // congela a posição escolhida: das próximas vezes o resultado é o mesmo
+      r.pos = (ini + (inicio - 1)) % 9;
+      r.data = iso(res.ano, res.mes, inicio);
     }
     cont[ini]++; cp[ini]++;
     res.cicloEncaixe[l] = ini;
-    if (r) res.reposAplicada[l] = r.data;
 
-    // turno do dia anterior ao encaixe, pra respeitar as 12h de descanso
+    // turno do dia anterior, pras 12h de descanso
     let ontem = 'FOLGA';
     if (inicio > 1) {
-      const t0 = ORDEM_LINHAS.find(t => ((res.escala[t] || {})[inicio - 1] || []).indexOf(l) >= 0);
-      if (t0) ontem = t0;
+      ontem = turnoDe({ escala: base }, l, inicio - 1) || 'FOLGA';
+    } else {
+      const dAnt = new Date(res.ano, res.mes - 1, 0);
+      const ant = S.historico[chaveMes(dAnt.getFullYear(), dAnt.getMonth() + 1)];
+      if (ant && ant.escala) ontem = turnoDe(ant, l, dAnt.getDate()) || 'FOLGA';
     }
     let turnoBloco = null;
     for (let d = inicio; d <= dias; d++) {
       const pos = (ini + d - 1) % 9;
-      if (pos >= 6) { turnoBloco = null; ontem = 'FOLGA'; celula('FOLGA', d).push(l); continue; }
+      if (pos >= 6) { turnoBloco = null; ontem = 'FOLGA'; base['FOLGA'][d].push(l); continue; }
       if (!turnoBloco) {
-        // olha o bloco de trabalho inteiro e fica no turno diurno mais vazio.
-        // O turno não muda dentro do bloco, então as 12h ficam garantidas.
-        let manha = 0, tarde = 0;
-        for (let d2 = d, p2 = pos; d2 <= dias && p2 < 6; d2++, p2++) {
-          manha += celula('06-14', d2).length; tarde += celula('14-22', d2).length;
-        }
-        turnoBloco = tarde < manha ? '14-22' : '06-14';
+        // escolhe o turno do bloco: o que menos estoura a meta e, no empate, o mais vazio
+        const nota = t => {
+          let estoura = 0, soma = 0;
+          for (let d2 = d, p2 = pos; d2 <= dias && p2 < 6; d2++, p2++) {
+            if (qtd(t, d2) >= meta[t]) estoura++;
+            soma += qtd(t, d2);
+          }
+          return estoura * 1000 + soma;
+        };
+        turnoBloco = nota('14-22') < nota('06-14') ? '14-22' : '06-14';
         if (!podeTrabalhar(ontem, turnoBloco)) turnoBloco = turnoBloco === '06-14' ? '14-22' : '06-14';
       }
-      celula(turnoBloco, d).push(l);
-      ontem = turnoBloco;
+      let t = turnoBloco;
+      if (!podeTrabalhar(ontem, t)) t = '14-22';
+      // turno já com a meta completa: vai pro 10-18 (se as 12h deixarem)
+      if (qtd(t, d) >= (meta[t] || 99) && podeTrabalhar(ontem, '10-18')) t = '10-18';
+      base[t][d].push(l);
+      ontem = t;
     }
   });
-  return novos.map(o => o.letra);
 }
 function diasEntreIso(a, b) { return Math.round((deIso(b) - deIso(a)) / 86400000); }
 /* Posição no ciclo 6x3 no dia `dataIso`, contando os dias que ele trabalhou
@@ -2703,7 +2709,7 @@ function ressincronizarMes(res) {
   if (!res || !res.escala) return;
   normalizarEscala(res);
   garantirBase(res);
-  if (ehMesExterno(res)) encaixarNovosNoMes(res, S.ops);
+  if (ehMesExterno(res)) recomporBaseExterna(res, S.ops);
   res.escala = clonar(res.base);
   normalizarEscala(res);
   aplicarFixosDeCadastro(res, S.ops);
@@ -2744,6 +2750,7 @@ function renomearLetra(antes, depois) {
     if (!res) return;
     varrerGrade(res.escala);
     varrerGrade(res.base);
+    varrerGrade(res.baseArquivo);
     varrerGrade(res.overtime);
     if (res.cicloEncaixe && antes in res.cicloEncaixe && !(depois in res.cicloEncaixe)) {
       res.cicloEncaixe[depois] = res.cicloEncaixe[antes]; delete res.cicloEncaixe[antes];
@@ -2814,7 +2821,7 @@ function gerarTudo(travarPassado) {
   const [a0, m0] = (S.mesIni || paraIso(new Date()).slice(0, 7)).split('-').map(Number);
   let estados = S.estadoInicial ? clonar(S.estadoInicial) : inicializarEstados(S.ops);
   // Operador que entrou depois que o mês de referência foi carregado: ele é
-  // encaixado nesse mês (ver encaixarNovosNoMes) e o ponto de partida do mês
+  // encaixado nesse mês (ver recomporBaseExterna) e o ponto de partida do mês
   // seguinte passa a continuar o ciclo dele a partir dali — senão ele caía
   // numa posição qualquer e o rodízio quebrava na virada do mês.
   if (S.mesReferencia && S.estadoInicial) {
@@ -4768,7 +4775,7 @@ $('#btConfirmarImportar').onclick = () => {
     // marca como "veio de fora": a geração não escreve por cima dele, só
     // reaplica ausências/edições em cima da grade importada
     cand.dados.externo = true;
-    delete cand.dados.base;
+    delete cand.dados.base; delete cand.dados.baseArquivo; delete cand.dados.cicloEncaixe; delete cand.dados.reposAplicada;
     S.historico[cand.chave] = cand.dados;
     Object.assign(S.manual, cand.manualFiltrado);
     Object.assign(S.corManual, cand.corManualFiltrado);
@@ -5356,7 +5363,7 @@ $('#btMesExterno').onclick = () => {
   if (!confirm(`Liberar ${MESES[atual.mes - 1]} de ${atual.ano} para ser regerado?\n\nA grade que veio do arquivo externo será substituída pela gerada pelo rodízio (as edições manuais e as ausências continuam sendo aplicadas por cima).`)) return;
   registrarPasso();
   delete atual.externo;
-  delete atual.base;
+  delete atual.base; delete atual.baseArquivo; delete atual.cicloEncaixe; delete atual.reposAplicada;
   if (S.mesReferencia && S.mesReferencia === atual) S.mesReferencia = null;
   gerarTudo(false);
   carimbarAtualizacao();
