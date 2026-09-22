@@ -2439,13 +2439,34 @@ function aplicarAusencias(res, ops) {
 /* ── Edições manuais sobrepõem a geração ── */
 function chaveManual(res, turno, dia) { return `${res.ano}-${res.mes}|${turno}|${dia}`; }
 function aplicarManuais(res) {
+  const travadas = {}; // dia -> Set dos turnos editados à mão naquele dia
   for (const k in S.manual) {
     const [am, turno, dia] = k.split('|');
     if (am !== `${res.ano}-${res.mes}`) continue;
     const d = Number(dia);
     if (!res.escala[turno] || d < 1 || d > res.dias) continue;
     res.escala[turno][d] = S.manual[k].slice();
+    (travadas[d] = travadas[d] || new Set()).add(turno);
   }
+  /* A edição manual trava só a célula editada; o resto do dia continua vindo
+     do gerador. Quando o rodízio muda (ex.: entrou operador novo), o gerador
+     pode colocar num turno NÃO travado alguém que já está numa célula travada
+     — e a letra aparecia duas vezes no mesmo dia. A edição manual é a decisão
+     do usuário, então ela manda: quem está numa célula de trabalho travada sai
+     dos turnos não travados do mesmo dia. A FOLGA não entra nessa limpeza —
+     folga + turno continua valendo como hora extra, igual ao editor. */
+  Object.keys(travadas).forEach(ds => {
+    const d = Number(ds), trav = travadas[d];
+    const aMao = new Set();
+    trav.forEach(t => { if (t !== 'FOLGA') (res.escala[t][d] || []).forEach(l => aMao.add(l)); });
+    if (!aMao.size) return;
+    ORDEM_LINHAS.forEach(t => {
+      if (t === 'FOLGA' || trav.has(t) || !res.escala[t] || !Array.isArray(res.escala[t][d])) return;
+      res.escala[t][d] = res.escala[t][d].filter(l => !aMao.has(l));
+      const ot = (res.overtime && res.overtime[t]) ? res.overtime[t][d] : null;
+      if (Array.isArray(ot)) res.overtime[t][d] = ot.filter(l => !aMao.has(l));
+    });
+  });
 }
 
 /* ── Reaplicar o cadastro em meses que já existem (inclusive os de fora) ──
