@@ -2565,9 +2565,16 @@ function encaixarNovosNoMes(res, ops) {
   });
   const { todosRot } = classificar(ops);
   const usoLetra = {}; ops.forEach(o => usoLetra[o.letra] = (usoLetra[o.letra] || 0) + 1);
+  if (!res.reposAplicada) res.reposAplicada = {};
+  const fimIso = iso(res.ano, res.mes, dias);
   // letra repetida no cadastro (ex.: dois "?" recém-criados) fica de fora até ser definida
-  const novos = todosRot.filter(o => o.letra && usoLetra[o.letra] === 1 && !emTurnoRod.has(o.letra)
-                                     && (emFixa.has(o.letra) || !emQualquer.has(o.letra)));
+  const novos = todosRot.filter(o => {
+    if (!o.letra || usoLetra[o.letra] !== 1) return false;
+    const r = o.reposicao;
+    // trocou de polo (saiu de posição fixa): reorganiza uma vez por troca
+    if (r && r.data <= fimIso && res.reposAplicada[o.letra] !== r.data) return true;
+    return !emTurnoRod.has(o.letra) && (emFixa.has(o.letra) || !emQualquer.has(o.letra));
+  });
   if (!novos.length) return [];
   const setNovos = new Set(novos.map(o => o.letra));
 
@@ -2599,12 +2606,20 @@ function encaixarNovosNoMes(res, ops) {
       }
     });
     const cp = contPolo[polo(o)] = contPolo[polo(o)] || vazio();
+    const r = o.reposicao;
     let ini = 0;
-    for (let p = 1; p < 9; p++) {
-      if (cont[p] < cont[ini] || (cont[p] === cont[ini] && cp[p] < cp[ini])) ini = p;
+    if (r && r.pos != null && r.data <= fimIso) {
+      // posição vem dos dias que ele já trabalhou antes da troca (sem estourar 6 seguidos)
+      const posNoInicio = (((r.pos + diasEntreIso(r.data, iso(res.ano, res.mes, inicio))) % 9) + 9) % 9;
+      ini = (((posNoInicio - (inicio - 1)) % 9) + 9) % 9;
+    } else {
+      for (let p = 1; p < 9; p++) {
+        if (cont[p] < cont[ini] || (cont[p] === cont[ini] && cp[p] < cp[ini])) ini = p;
+      }
     }
     cont[ini]++; cp[ini]++;
     res.cicloEncaixe[l] = ini;
+    if (r) res.reposAplicada[l] = r.data;
 
     // turno do dia anterior ao encaixe, pra respeitar as 12h de descanso
     let ontem = 'FOLGA';
@@ -2631,6 +2646,58 @@ function encaixarNovosNoMes(res, ops) {
     }
   });
   return novos.map(o => o.letra);
+}
+function diasEntreIso(a, b) { return Math.round((deIso(b) - deIso(a)) / 86400000); }
+/* Posição no ciclo 6x3 no dia `dataIso`, contando os dias que ele trabalhou
+   seguidos logo antes (em qualquer turno, inclusive MPS). Ex.: trabalhou
+   segunda e terça no MPS e trocou na quarta → quarta é o 3º dia do bloco
+   (posição 2), então ele trabalha mais 4 dias e folga 3. Se já tinha 6 ou
+   mais seguidos, começa pela folga. Sem histórico nenhum → null (o encaixe
+   escolhe a posição com menos gente). */
+function posicaoPeloHistorico(letra, dataIso) {
+  const base = deIso(dataIso);
+  let seguidos = 0;
+  for (let i = 1; i <= 9; i++) {
+    const x = new Date(base); x.setDate(x.getDate() - i);
+    const res = S.historico[chaveMes(x.getFullYear(), x.getMonth() + 1)];
+    const t = res && res.escala ? turnoDe(res, letra, x.getDate()) : null;
+    if (i === 1 && !t) return null;
+    if (!t || TURNOS_TRABALHO.indexOf(t) < 0) break;
+    seguidos++;
+  }
+  return Math.min(seguidos, 6);
+}
+function ehDoRodizio(o) { return classificar([o]).todosRot.length > 0; }
+/* Troca de polo que tira o operador de uma posição fixa (MPS / Aracaju-3) e
+   põe no rodízio: a escala se reorganiza sozinha a partir de HOJE, por cima
+   das edições manuais DELE (as dos outros ficam como estão). O que já passou
+   não muda. */
+function reorganizarAposTrocaDePolo(o) {
+  const hoje = paraIso(new Date());
+  const l = o.letra;
+  o.reposicao = { data: hoje, pos: posicaoPeloHistorico(l, hoje) };
+  // edições manuais dele de hoje em diante deixam de valer
+  Object.keys(S.manual).forEach(k => {
+    const [am, , dia] = k.split('|'); const [a, m] = am.split('-').map(Number);
+    if (iso(a, m, Number(dia)) < hoje) return;
+    if ((S.manual[k] || []).indexOf(l) >= 0) S.manual[k] = S.manual[k].filter(x => x !== l);
+  });
+  gerarTudo();
+  // célula travada por edição manual onde o gerador quer colocá-lo: ele entra
+  // nela (senão sumia naquele dia, porque a célula travada não muda)
+  let mudou = false;
+  Object.values(S.historico).forEach(res => {
+    if (!res || !res.base) return;
+    const tmp = { ano: res.ano, mes: res.mes, dias: res.dias, escala: clonar(res.base), overtime: {}, info: {} };
+    normalizarEscala(tmp); aplicarFixosDeCadastro(tmp, S.ops); aplicarAusencias(tmp, S.ops);
+    for (let d = 1; d <= res.dias; d++) {
+      if (iso(res.ano, res.mes, d) < hoje) continue;
+      const alvo = turnoDe(tmp, l, d); if (!alvo) continue;
+      const k = chaveManual(res, alvo, d);
+      if (k in S.manual && S.manual[k].indexOf(l) < 0) { S.manual[k].push(l); mudou = true; }
+    }
+  });
+  if (mudou) { ressincronizarTodosOsMeses(); desenharTudo(); }
 }
 function ressincronizarMes(res) {
   if (!res || !res.escala) return;
@@ -2792,8 +2859,23 @@ function gerarTudo(travarPassado) {
       // partir do que está de fato nele.
       ressincronizarMes(existente);
       estados = garantirEstados(inferirEstadosDeEscala(existente, S.ops), S.ops);
+      // quem foi encaixado neste mês continua do ciclo que o encaixe escolheu
+      Object.keys(existente.cicloEncaixe || {}).forEach(l => {
+        if (estados[l]) estados[l].ciclo = (existente.cicloEncaixe[l] + existente.dias) % 9;
+      });
       meses.push(existente);
     } else {
+      // quem entrou no rodízio neste mês por troca de polo começa na posição
+      // calculada pelos dias que já tinha trabalhado (não estoura 6 seguidos)
+      S.ops.forEach(o => {
+        const r = o.reposicao; if (!r || r.pos == null) return;
+        const [ry, rm, rd] = r.data.split('-').map(Number);
+        if (ry !== a || rm !== m || !ehDoRodizio(o)) return;
+        estados = clonar(estados);
+        const e = estados[o.letra] ? estados[o.letra] : estadoPadrao(0);
+        e.ciclo = (((r.pos - (rd - 1)) % 9) + 9) % 9;
+        estados[o.letra] = e;
+      });
       const res = gerarMes(S.ops, a, m, estados);
       estados = res.estados;
       garantirBase(res);              // grade "limpa", antes de ausência/manual
@@ -3231,7 +3313,11 @@ function desenharCadastro() {
         // a geração futura — então reaplica nos meses que já existem
         const estrutural = ['principal', 'secundario', 'tipo', 'aju_especial'].indexOf(prop) >= 0;
         if (estrutural) registrarPasso();
+        const eraDoRodizio = ehDoRodizio(o);
         o[prop] = s.value;
+        // saiu do MPS pra um polo de rodízio mas o tipo ficou "MPS": ele
+        // continuaria preso na linha MPS, então o tipo volta a ser Formado
+        if (prop === 'principal' && s.value !== 'MPS' && o.tipo === 'MPS') o.tipo = 'Formado';
         // Se a prioridade daquele polo ainda estiver no padrão "sem definir"
         // (99), acompanha a troca de polo sugerindo a próxima da sequência.
         if (prop === 'principal' && Number(o.prioridade_polo_principal) === 99) {
@@ -3241,13 +3327,16 @@ function desenharCadastro() {
         }
         desenharCadastro();
         if (estrutural) {
-          ressincronizarTodosOsMeses();
-          desenharEscala(); desenharOperador(); desenharPainel();
+          // a escala se reorganiza sozinha a partir de hoje
+          if (!eraDoRodizio && ehDoRodizio(o)) reorganizarAposTrocaDePolo(o);
+          else gerarTudo();
           carimbarAtualizacao();
           const fixo = o.tipo === 'MPS' || polo(o) === 'MPS' || polo(o) === 'Aracaju - 3';
           aviso(fixo
-            ? `${nomeCurto(o.nome) || o.letra} reposicionado em todos os meses guardados. Use "Gerar escala" pra redistribuir o rodízio de quem ficou.`
-            : 'Cadastro atualizado. Use "Gerar escala" pra recalcular o rodízio.');
+            ? `${nomeCurto(o.nome) || o.letra} reposicionado e escala reorganizada a partir de hoje.`
+            : !eraDoRodizio
+              ? `${nomeCurto(o.nome) || o.letra} entrou no rodízio 6x3 a partir de hoje, contando os dias que já tinha trabalhado.`
+              : 'Cadastro atualizado e escala reorganizada a partir de hoje.');
         }
       };
       return s;
@@ -4864,7 +4953,12 @@ function normalizarOp(o) {
     prioridade_aju: Number(o.prioridade_aju ?? 99),
     prioridade_polo_principal: Number(o.prioridade_polo_principal ?? 99),
     prioridade_polo_secundario: Number(o.prioridade_polo_secundario ?? 99),
-    ausencias: (o.ausencias || []).map(a => ({ inicio: a.inicio || '', fim: a.fim || '', motivo: a.motivo || 'Férias' }))
+    ausencias: (o.ausencias || []).map(a => ({ inicio: a.inicio || '', fim: a.fim || '', motivo: a.motivo || 'Férias' })),
+    // entrada no rodízio vinda de posição fixa (ex.: MPS → polo): data da troca e
+    // posição no ciclo 6x3 nesse dia, calculada pelos dias que ele já tinha trabalhado
+    ...(o.reposicao && o.reposicao.data
+      ? { reposicao: { data: o.reposicao.data, pos: o.reposicao.pos == null ? null : Number(o.reposicao.pos) } }
+      : {})
   };
 }
 
