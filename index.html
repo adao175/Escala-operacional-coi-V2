@@ -2495,10 +2495,82 @@ function aplicarFixosDeCadastro(res, ops) {
     fixos3.forEach(o => mover(o.letra, d, !ehFds(ano, mes, d) ? '08-17' : 'FOLGA'));
   }
 }
+/* Operador novo em mês que veio de fora (mês de referência / importado).
+   Esses meses nunca são regerados, então quem entrou no cadastro depois não
+   aparecia em lugar nenhum da grade deles. Aqui o operador é encaixado na
+   `base` do mês (a grade "limpa"), só de HOJE pra frente — dias que já
+   passaram não mudam. Ele entra no ciclo 6x3 na posição com menos gente
+   (desempate: menos gente do mesmo polo) e, em cada bloco de trabalho, no
+   turno diurno (06-14 ou 14-22) mais vazio. Madrugada não é atribuída aqui.
+   Como fica gravado na base, das próximas vezes ele já "está" no mês e não é
+   encaixado de novo; ausências e edições manuais continuam valendo por cima. */
+function letrasNaGrade(grade) {
+  const s = new Set();
+  if (!grade) return s;
+  Object.keys(grade).forEach(t => {
+    const linha = grade[t];
+    if (linha) Object.keys(linha).forEach(d => (linha[d] || []).forEach(l => s.add(l)));
+  });
+  return s;
+}
+function encaixarNovosNoMes(res, ops) {
+  if (!res || !res.base) return [];
+  const hj = hojeInfo();
+  if (res.ano < hj.ano || (res.ano === hj.ano && res.mes < hj.mes)) return []; // mês passado: não mexe
+  const inicio = (res.ano === hj.ano && res.mes === hj.mes) ? hj.dia : 1;
+  const dias = res.dias, base = res.base;
+  const presentes = letrasNaGrade(base);
+  const { todosRot } = classificar(ops);
+  const novos = todosRot.filter(o => o.letra && o.letra !== '?' && !presentes.has(o.letra));
+  if (!novos.length) return [];
+
+  // posição no ciclo (relativa ao dia 1 deste mês) de quem já está na grade
+  const inferidos = inferirEstadosDeEscala({ ano: res.ano, mes: res.mes, dias, escala: base },
+                                           ops.filter(o => presentes.has(o.letra)));
+  const vazio = () => new Array(9).fill(0);
+  const cont = vazio(), contPolo = {};
+  todosRot.forEach(o => {
+    const e = inferidos[o.letra]; if (!e) return;
+    const ini = (((e.ciclo - dias) % 9) + 9) % 9;
+    cont[ini]++;
+    (contPolo[polo(o)] = contPolo[polo(o)] || vazio())[ini]++;
+  });
+  const celula = (t, d) => {
+    if (!base[t]) base[t] = {};
+    if (!Array.isArray(base[t][d])) base[t][d] = [];
+    return base[t][d];
+  };
+
+  novos.forEach(o => {
+    const cp = contPolo[polo(o)] = contPolo[polo(o)] || vazio();
+    let ini = 0;
+    for (let p = 1; p < 9; p++) {
+      if (cont[p] < cont[ini] || (cont[p] === cont[ini] && cp[p] < cp[ini])) ini = p;
+    }
+    cont[ini]++; cp[ini]++;
+    let turnoBloco = null;
+    for (let d = inicio; d <= dias; d++) {
+      const pos = (ini + d - 1) % 9;
+      if (pos >= 6) { turnoBloco = null; celula('FOLGA', d).push(o.letra); continue; }
+      if (!turnoBloco) {
+        // olha o bloco de trabalho inteiro e fica no turno diurno mais vazio.
+        // O turno não muda dentro do bloco, então as 12h de descanso ficam garantidas.
+        let manha = 0, tarde = 0;
+        for (let d2 = d, p2 = pos; d2 <= dias && p2 < 6; d2++, p2++) {
+          manha += celula('06-14', d2).length; tarde += celula('14-22', d2).length;
+        }
+        turnoBloco = tarde < manha ? '14-22' : '06-14';
+      }
+      celula(turnoBloco, d).push(o.letra);
+    }
+  });
+  return novos.map(o => o.letra);
+}
 function ressincronizarMes(res) {
   if (!res || !res.escala) return;
   normalizarEscala(res);
   garantirBase(res);
+  if (ehMesExterno(res)) encaixarNovosNoMes(res, S.ops);
   res.escala = clonar(res.base);
   normalizarEscala(res);
   aplicarFixosDeCadastro(res, S.ops);
@@ -2605,6 +2677,25 @@ function gerarTudo(travarPassado) {
   limparAusenciasVencidas();
   const [a0, m0] = (S.mesIni || paraIso(new Date()).slice(0, 7)).split('-').map(Number);
   let estados = S.estadoInicial ? clonar(S.estadoInicial) : inicializarEstados(S.ops);
+  // Operador que entrou depois que o mês de referência foi carregado: ele é
+  // encaixado nesse mês (ver encaixarNovosNoMes) e o ponto de partida do mês
+  // seguinte passa a continuar o ciclo dele a partir dali — senão ele caía
+  // numa posição qualquer e o rodízio quebrava na virada do mês.
+  if (S.mesReferencia && S.estadoInicial) {
+    const ref = S.mesReferencia;
+    ref.externo = true;
+    ressincronizarMes(ref);
+    const [pa, pm] = proximoMes(ref.ano, ref.mes);
+    if (pa === a0 && pm === m0) {
+      const naGrade = letrasNaGrade(ref.base);
+      const inf = inferirEstadosDeEscala(ref, S.ops);
+      Object.keys(inf).forEach(l => {
+        if (S.estadoInicial[l] || !naGrade.has(l)) return;
+        S.estadoInicial[l] = clonar(inf[l]);
+        estados[l] = clonar(inf[l]);
+      });
+    }
+  }
   // Vale tanto do zero quanto em cima do que foi inferido de um arquivo
   // carregado — só troca a posição de cada um no ciclo, sem mexer no último
   // turno real (então não afeta a segurança das 12h no 1º dia gerado).
