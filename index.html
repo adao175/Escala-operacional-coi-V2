@@ -409,10 +409,7 @@ body.foco-ativo{overflow:hidden}
 
 <header class="topo">
   <div class="marca">
-    <img id="logoMarca" src="logo.svg" alt="Energisa" style="height:42px"
-         data-alt1="https://upload.wikimedia.org/wikipedia/commons/8/89/Energisa.svg"
-         data-alt2="logo.png">
-    <div id="logoTexto" class="logo-texto esconde">COI<span>Central de Operações</span></div>
+    <div id="logoTexto" class="logo-texto">Escala<span>Operacional</span></div>
     <div class="marca-sep"></div>
     <div class="marca-info">
       <div class="l1"><span id="marcaAtualizado">Atualizado em: —</span><span id="marcaPendente" class="esconde">não salvo</span></div>
@@ -2860,9 +2857,23 @@ function desenharEscala() {
   })));
   tfoot.appendChild(trf); t.appendChild(tfoot);
 }
+/* nome abreviado só pra exibição: primeiro nome completo + iniciais dos sobrenomes.
+   "AISLAN LIMA SANTOS" → "Aislan L. S." — partículas (de, da, dos...) são puladas.
+   O cadastro continua guardando o nome completo; busca e ordenação usam ele. */
+const PARTICULAS_NOME = new Set(['DE', 'DA', 'DO', 'DAS', 'DOS', 'E', 'D']);
+function nomeCurto(nome) {
+  const partes = String(nome || '').trim().split(/\s+/).filter(Boolean);
+  if (!partes.length) return '';
+  const maiusc = t => t.toLocaleUpperCase('pt-BR');
+  const primeiro = maiusc(partes[0].charAt(0)) + partes[0].slice(1).toLocaleLowerCase('pt-BR');
+  const iniciais = partes.slice(1)
+    .filter(p => !PARTICULAS_NOME.has(maiusc(p)))
+    .map(p => maiusc(p.charAt(0)) + '.');
+  return [primeiro, ...iniciais].join(' ');
+}
 function nomeDe(letra) {
   const o = S.ops.find(x => x.letra === letra);
-  return o ? `[${letra}] ${o.nome}` : `[${letra}] não cadastrado`;
+  return o ? `[${letra}] ${nomeCurto(o.nome)}` : `[${letra}] não cadastrado`;
 }
 
 /* ═══════════════ visão por operador ═══════════════ */
@@ -2977,7 +2988,7 @@ function desenharOperador() {
     const tdN = el('td', { class: 'col-op' });
     const n1 = el('span', { class: 'op-nome' });
     n1.appendChild(el('span', { class: 'selo-letra', text: o.letra }));
-    n1.appendChild(document.createTextNode(o.nome));
+    n1.appendChild(document.createTextNode(nomeCurto(o.nome)));
     tdN.appendChild(n1);
     const legendas = [o.tipo, o.aju_especial === 'Sim' ? 'AJU especial' : '', o.sem_madrugada ? 'sem madrugada' : ''].filter(Boolean);
     const sub = el('span', { class: 'op-sub', text: legendas.join(' · ') });
@@ -3001,7 +3012,7 @@ function desenharOperador() {
       const poloDia = turno ? poloDoDia(res, d, turno, o.letra) : '';
       const td = el('td', {
         class: 'mini ab-' + cls,
-        title: `${o.nome} · dia ${d}: ${turno ? ROTULO[turno] : 'Folga'}` + (poloDia ? `\nPolo do dia: ${poloDia}` : ''),
+        title: `${nomeCurto(o.nome)} · dia ${d}: ${turno ? ROTULO[turno] : 'Folga'}` + (poloDia ? `\nPolo do dia: ${poloDia}` : ''),
         text: ab
       });
       tr.appendChild(td);
@@ -3065,7 +3076,7 @@ function desenharCadastro() {
           carimbarAtualizacao();
           const fixo = o.tipo === 'MPS' || polo(o) === 'MPS' || polo(o) === 'Aracaju - 3';
           aviso(fixo
-            ? `${o.nome || o.letra} reposicionado em todos os meses guardados. Use "Gerar escala" pra redistribuir o rodízio de quem ficou.`
+            ? `${nomeCurto(o.nome) || o.letra} reposicionado em todos os meses guardados. Use "Gerar escala" pra redistribuir o rodízio de quem ficou.`
             : 'Cadastro atualizado. Use "Gerar escala" pra recalcular o rodízio.');
         }
       };
@@ -3160,7 +3171,7 @@ function desenharAusencias() {
   linhas.forEach(({ o, a, i }) => {
     const tr = el('tr');
     tr.appendChild(el('td', {}, [el('span', { class: 'selo-letra', text: o.letra })]));
-    tr.appendChild(el('td', { text: o.nome }));
+    tr.appendChild(el('td', { text: nomeCurto(o.nome) }));
 
     const tdM = el('td'); const sm = el('select');
     sm.disabled = !S.editando;
@@ -3287,7 +3298,7 @@ function desenharPainel() {
   S.ops.slice().sort((a, b) => trab[b.letra] - trab[a.letra]).forEach(o => {
     const tr = el('tr');
     tr.appendChild(el('td', {}, [el('span', { class: 'selo-letra', text: o.letra })]));
-    tr.appendChild(el('td', { text: o.nome }));
+    tr.appendChild(el('td', { text: nomeCurto(o.nome) }));
     tr.appendChild(el('td', { text: polo(o) }));
     tr.appendChild(el('td', {}, [el('span', {
       class: 'selo ' + (o.tipo === 'Assistido' ? 'info' : o.tipo === 'MPS' ? 'aviso' : 'neutro'), text: o.tipo || '—'
@@ -3326,7 +3337,7 @@ function desenharPainel() {
   rank.forEach(o => {
     const l = el('div', { class: 'md-linha', style: 'display:flex;align-items:center;gap:9px;margin:3px 0' });
     l.appendChild(el('span', { class: 'selo-letra', text: o.letra }));
-    l.appendChild(el('span', { class: 'md-nome', style: 'font-size:12px;width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap', text: o.nome }));
+    l.appendChild(el('span', { class: 'md-nome', style: 'font-size:12px;width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap', text: nomeCurto(o.nome) }));
     const trilho = el('div', { class: 'trilho' });
     trilho.appendChild(el('div', { class: 'barra', style: `width:${Math.round(madr[o.letra] / maxN * 100)}%` }));
     l.appendChild(trilho);
@@ -3342,7 +3353,7 @@ function desenharPainel() {
   ausMes.sort((x, y) => (x.a.inicio || '').localeCompare(y.a.inicio || '')).forEach(({ o, a }) => {
     const l = el('div', { style: 'display:flex;align-items:center;gap:9px;margin:4px 0;font-size:12.5px' });
     l.appendChild(el('span', { class: 'selo-letra', text: o.letra }));
-    l.appendChild(el('span', { style: 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap', text: o.nome }));
+    l.appendChild(el('span', { style: 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap', text: nomeCurto(o.nome) }));
     l.appendChild(el('span', { class: 'selo ' + (a.motivo === 'Férias' ? 'ok' : 'aviso'), text: a.motivo }));
     l.appendChild(el('span', { style: 'font-family:var(--mono);font-size:11.5px;color:var(--ink-3)', text: `${br(a.inicio)} → ${br(a.fim)}` }));
     corpo3b.appendChild(l);
@@ -3543,7 +3554,7 @@ async function exportarRelatorioPDF() {
     y = novaPagina('Dias trabalhados, madrugadas e horas extras', 'Um operador por linha, ordenado do maior para o menor número de dias trabalhados.');
     const listaOrdenada = S.ops.slice().sort((a, b) => trab[b.letra] - trab[a.letra]);
     tabela(['Letra', 'Operador', 'Polo', 'Tipo', 'Dias', 'Madr.', 'Extra'],
-      listaOrdenada.map(o => [o.letra, o.nome, polo(o) || '—', o.tipo || '—', String(trab[o.letra]), String(madr[o.letra]), String(extra[o.letra])]),
+      listaOrdenada.map(o => [o.letra, nomeCurto(o.nome), polo(o) || '—', o.tipo || '—', String(trab[o.letra]), String(madr[o.letra]), String(extra[o.letra])]),
       y, { columnStyles: { 0: { cellWidth: 12 }, 4: { cellWidth: 14, halign: 'right' }, 5: { cellWidth: 14, halign: 'right' }, 6: { cellWidth: 14, halign: 'right' } } });
 
     // ---------- PÁGINA 3: distribuição percentual por polo/regional (ranqueado) ----------
@@ -3553,7 +3564,7 @@ async function exportarRelatorioPDF() {
       S.ops.slice().sort((a, b) => a.nome.localeCompare(b.nome)).map(o => {
         const ranking = topPolosOperador(contRegional[o.letra] || {}, trab[o.letra]);
         const celulas = [0, 1, 2, 3, 4].map(i => ranking[i] ? `${ranking[i].sigla} - ${ranking[i].pct.toFixed(0)}%` : '-');
-        return [o.letra, o.nome, ...celulas];
+        return [o.letra, nomeCurto(o.nome), ...celulas];
       }), y, {
         styles: { fontSize: 8.5, halign: 'center' },
         headStyles: { fillColor: INK, textColor: 255, fontStyle: 'bold', fontSize: 8.5, halign: 'center' },
@@ -3572,13 +3583,13 @@ async function exportarRelatorioPDF() {
     } else {
       const img = graficoBase64({
         type: 'bar',
-        data: { labels: rankOtMes.map(o => o.nome), datasets: [{ label: 'Horas extras', data: rankOtMes.map(o => extra[o.letra]), backgroundColor: '#b8322c' }] },
+        data: { labels: rankOtMes.map(o => nomeCurto(o.nome)), datasets: [{ label: 'Horas extras', data: rankOtMes.map(o => extra[o.letra]), backgroundColor: '#b8322c' }] },
         options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { precision: 0 } } } }
       }, 1000, Math.max(260, rankOtMes.length * 42));
       const alturaImg = Math.max(70, rankOtMes.length * 8);
       doc.addImage(img, 'PNG', MX, y, PW - MX * 2, alturaImg);
       y += alturaImg + 8;
-      tabela(['Letra', 'Operador', 'Horas extras'], rankOtMes.map(o => [o.letra, o.nome, String(extra[o.letra])]), y, { columnStyles: { 0: { cellWidth: 16 }, 2: { cellWidth: 30, halign: 'right' } } });
+      tabela(['Letra', 'Operador', 'Horas extras'], rankOtMes.map(o => [o.letra, nomeCurto(o.nome), String(extra[o.letra])]), y, { columnStyles: { 0: { cellWidth: 16 }, 2: { cellWidth: 30, halign: 'right' } } });
     }
 
     // ---------- PÁGINA 5: ranking de madrugadas (mês atual) ----------
@@ -3589,7 +3600,7 @@ async function exportarRelatorioPDF() {
     } else {
       const img = graficoBase64({
         type: 'bar',
-        data: { labels: rankMadrMes.map(o => o.nome), datasets: [{ label: 'Madrugadas', data: rankMadrMes.map(o => madr[o.letra]), backgroundColor: '#563095' }] },
+        data: { labels: rankMadrMes.map(o => nomeCurto(o.nome)), datasets: [{ label: 'Madrugadas', data: rankMadrMes.map(o => madr[o.letra]), backgroundColor: '#563095' }] },
         options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { precision: 0 } } } }
       }, 1000, Math.max(260, rankMadrMes.length * 42));
       const alturaImg = Math.max(70, rankMadrMes.length * 8);
@@ -3613,7 +3624,7 @@ async function exportarRelatorioPDF() {
       y += 52;
       y = tabela(['Letra', 'Operador', 'Motivo', 'Início', 'Fim', 'Dias'],
         ausMes.sort((x, z) => (x.a.inicio || '').localeCompare(z.a.inicio || '')).map(({ o, a }) => [
-          o.letra, o.nome, a.motivo, br(a.inicio), br(a.fim), String(diasAusenciaNoMes(a, res.ano, res.mes, res.dias))
+          o.letra, nomeCurto(o.nome), a.motivo, br(a.inicio), br(a.fim), String(diasAusenciaNoMes(a, res.ano, res.mes, res.dias))
         ]), y, { columnStyles: { 0: { cellWidth: 14 }, 5: { cellWidth: 14, halign: 'right' } } });
     }
 
@@ -3684,7 +3695,7 @@ async function exportarRelatorioPDF() {
           doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(CINZA[0], CINZA[1], CINZA[2]);
           doc.text('Sem registros no período.', MX, y); doc.setTextColor(INK[0], INK[1], INK[2]); y += 8; return;
         }
-        y = tabela(['#', 'Operador', unidade], lista.map(o => [o.letra, o.nome, String(mapa[o.letra])]), y,
+        y = tabela(['#', 'Operador', unidade], lista.map(o => [o.letra, nomeCurto(o.nome), String(mapa[o.letra])]), y,
           { columnStyles: { 0: { cellWidth: 10 }, 2: { cellWidth: 30, halign: 'right' } }, headStyles: { fillColor: cor, textColor: 255, fontStyle: 'bold', fontSize: 8 } });
       }
       podio('Quem mais fez horas extras', topOt, acumOtOp, 'Horas extras', VERM);
@@ -4021,7 +4032,7 @@ function abaOperador(res) {
     (RANK_POLO[polo(a)] ?? 99) - (RANK_POLO[polo(b)] ?? 99) || a.nome.localeCompare(b.nome));
   const turnos = [];
   ordenados.forEach(o => {
-    const l = [o.letra, o.nome, polo(o), o.tipo || ''];
+    const l = [o.letra, nomeCurto(o.nome), polo(o), o.tipo || ''];
     const seq = [];
     let t2 = 0, n = 0;
     for (let d = 1; d <= dias; d++) {
@@ -4068,7 +4079,7 @@ function abaCadastro() {
   const cab = ['Letra', 'Nome', 'Login', 'Polo principal', 'Polo secundário', 'Tipo', 'AJU especial', 'Sem madrugada'];
   const linhas = [['CADASTRO DE OPERADORES'], [xlsCarimbo()], [], cab];
   S.ops.slice().sort((a, b) => a.nome.localeCompare(b.nome)).forEach(o =>
-    linhas.push([o.letra, o.nome, o.login || '', polo(o), o.secundario || '', o.tipo || '',
+    linhas.push([o.letra, nomeCurto(o.nome), o.login || '', polo(o), o.secundario || '', o.tipo || '',
                  o.aju_especial || 'Não', o.sem_madrugada ? 'Sim' : 'Não']));
   const ws = XLSX.utils.aoa_to_sheet(linhas);
   ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: linhas.length - 1, c: cab.length - 1 } });
@@ -5223,7 +5234,7 @@ function abrirModalAus(letraPre, diaIso) {
   if (!S.ops.length) return;
   const sel = $('#ausOp'); sel.innerHTML = '';
   S.ops.slice().sort((a, b) => a.nome.localeCompare(b.nome))
-    .forEach(o => sel.appendChild(el('option', { value: o.letra, text: `${o.letra} — ${o.nome}` })));
+    .forEach(o => sel.appendChild(el('option', { value: o.letra, text: `${o.letra} — ${nomeCurto(o.nome)}` })));
   if (letraPre && S.ops.some(o => o.letra === letraPre)) sel.value = letraPre;
   const sm = $('#ausMotivo'); sm.innerHTML = '';
   MOTIVOS.forEach(m => sm.appendChild(el('option', { value: m, text: m })));
@@ -5246,7 +5257,7 @@ $('#ausSalvar').onclick = () => {
   op.ausencias.push({ inicio: ini, fim, motivo: $('#ausMotivo').value });
   fecharAus();
   desenharAusencias(); desenharCadastro(); gerarTudo(); carimbarAtualizacao();
-  aviso(`Ausência registrada para ${op.nome}.`);
+  aviso(`Ausência registrada para ${nomeCurto(op.nome)}.`);
 };
 document.addEventListener('click', e => {
   if (!S.editando) return;
@@ -5691,7 +5702,7 @@ function desenharInformacoes() {
   S.ops.slice().sort((a, b) => a.nome.localeCompare(b.nome)).forEach(o => {
     const tr = el('tr');
     tr.appendChild(el('td', {}, [el('span', { class: 'selo-letra', text: o.letra })]));
-    tr.appendChild(el('td', { text: o.nome }));
+    tr.appendChild(el('td', { text: nomeCurto(o.nome) }));
     tr.appendChild(el('td', { style: 'font-family:var(--mono)', text: o.login || '—' }));
     tr.appendChild(el('td', {}, [el('span', {
       class: 'selo ' + (o.tipo === 'Assistido' ? 'info' : o.tipo === 'MPS' ? 'ok' : 'neutro'), text: o.tipo || 'Formado' })]));
