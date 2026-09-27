@@ -409,7 +409,10 @@ body.foco-ativo{overflow:hidden}
 
 <header class="topo">
   <div class="marca">
-    <div id="logoTexto" class="logo-texto">Escala<span>Operacional</span></div>
+    <img id="logoMarca" src="logo.svg" alt="Energisa" style="height:42px"
+         data-alt1="https://upload.wikimedia.org/wikipedia/commons/8/89/Energisa.svg"
+         data-alt2="logo.png">
+    <div id="logoTexto" class="logo-texto esconde">COI<span>Central de Operações</span></div>
     <div class="marca-sep"></div>
     <div class="marca-info">
       <div class="l1"><span id="marcaAtualizado">Atualizado em: —</span><span id="marcaPendente" class="esconde">não salvo</span></div>
@@ -2439,38 +2442,13 @@ function aplicarAusencias(res, ops) {
 /* ── Edições manuais sobrepõem a geração ── */
 function chaveManual(res, turno, dia) { return `${res.ano}-${res.mes}|${turno}|${dia}`; }
 function aplicarManuais(res) {
-  const travadas = {}; // dia -> Set dos turnos editados à mão naquele dia
   for (const k in S.manual) {
     const [am, turno, dia] = k.split('|');
     if (am !== `${res.ano}-${res.mes}`) continue;
     const d = Number(dia);
     if (!res.escala[turno] || d < 1 || d > res.dias) continue;
     res.escala[turno][d] = S.manual[k].slice();
-    (travadas[d] = travadas[d] || new Set()).add(turno);
   }
-  /* A edição manual trava só a célula editada; o resto do dia continua vindo
-     do gerador. Quando o rodízio muda (ex.: entrou operador novo), o gerador
-     pode colocar num turno NÃO travado alguém que já está numa célula travada
-     — e a letra aparecia duas vezes no mesmo dia. A edição manual é a decisão
-     do usuário, então ela manda: quem está numa célula de trabalho travada sai
-     dos turnos não travados do mesmo dia. A FOLGA não entra nessa limpeza —
-     folga + turno continua valendo como hora extra, igual ao editor. */
-  Object.keys(travadas).forEach(ds => {
-    const d = Number(ds), trav = travadas[d];
-    const aMao = new Set(), folgaAMao = new Set();
-    trav.forEach(t => (res.escala[t][d] || []).forEach(l => (t === 'FOLGA' ? folgaAMao : aMao).add(l)));
-    if (!aMao.size && !folgaAMao.size) return;
-    ORDEM_LINHAS.forEach(t => {
-      if (trav.has(t) || !res.escala[t] || !Array.isArray(res.escala[t][d])) return;
-      // quem está numa célula de trabalho travada sai das outras (menos da folga:
-      // folga + turno = hora extra, como no editor); quem está numa FOLGA travada
-      // sai dos turnos não travados — senão ficava de folga e trabalhando
-      const tirar = l => (t !== 'FOLGA' && aMao.has(l)) || (t !== 'FOLGA' && folgaAMao.has(l) && !aMao.has(l));
-      res.escala[t][d] = res.escala[t][d].filter(l => !tirar(l));
-      const ot = (res.overtime && res.overtime[t]) ? res.overtime[t][d] : null;
-      if (Array.isArray(ot)) res.overtime[t][d] = ot.filter(l => !tirar(l));
-    });
-  });
 }
 
 /* ── Reaplicar o cadastro em meses que já existem (inclusive os de fora) ──
@@ -2520,196 +2498,10 @@ function aplicarFixosDeCadastro(res, ops) {
     fixos3.forEach(o => mover(o.letra, d, !ehFds(ano, mes, d) ? '08-17' : 'FOLGA'));
   }
 }
-/* Mês que veio de fora (mês de referência / importado) não é regerado. A grade
-   do arquivo fica guardada em `baseArquivo` e NUNCA é alterada; a `base` do mês
-   é recomposta a partir dela toda vez, mexendo SÓ em quem tem uma entrada no
-   rodízio registrada (`reposicao` no cadastro):
-     - operador que trocou de polo/função e saiu de posição fixa (MPS,
-       Aracaju-3) pra um polo de rodízio — registrado na hora da troca;
-     - operador novo, que não existe no arquivo — registrado na 1ª vez que
-       aparece aqui, a partir de hoje.
-   A partir da data registrada ele sai de onde estava no arquivo e entra no 6x3
-   na posição calculada (dias que já tinha trabalhado seguidos, ou a posição
-   com menos gente se não tiver histórico). Em cada bloco fica no turno diurno
-   com menos gente; se o turno já estiver com a meta (8) completa, ele vai pro
-   10-18 naquele dia, sempre respeitando as 12h de descanso. Madrugada não é
-   atribuída aqui. Todo o resto do arquivo fica exatamente como veio. */
-function letrasNaGrade(grade) {
-  const s = new Set();
-  if (!grade) return s;
-  Object.keys(grade).forEach(t => {
-    const linha = grade[t];
-    if (linha) Object.keys(linha).forEach(d => (linha[d] || []).forEach(l => s.add(l)));
-  });
-  return s;
-}
-function recomporBaseExterna(res, ops) {
-  if (!res || !res.base) return;
-  if (!res.baseArquivo) res.baseArquivo = clonar(res.base);
-  const base = clonar(res.baseArquivo);
-  const dias = res.dias;
-  ORDEM_LINHAS.forEach(t => {
-    if (!base[t]) base[t] = {};
-    for (let d = 1; d <= dias; d++) if (!Array.isArray(base[t][d])) base[t][d] = [];
-  });
-  res.base = base;
-  res.cicloEncaixe = {};
-  delete res.reposAplicada; // campo da versão anterior
-
-  const iniMesIso = iso(res.ano, res.mes, 1), fimIso = iso(res.ano, res.mes, dias);
-  const hoje = paraIso(new Date());
-  const noArquivo = letrasNaGrade(res.baseArquivo);
-  const { todosRot } = classificar(ops);
-  const usoLetra = {}; ops.forEach(o => usoLetra[o.letra] = (usoLetra[o.letra] || 0) + 1);
-  const unica = o => o.letra && usoLetra[o.letra] === 1; // ex.: dois "?" recém-criados ficam de fora
-
-  // operador novo (não está no arquivo): entra a partir de hoje
-  todosRot.forEach(o => {
-    if (unica(o) && !o.reposicao && !noArquivo.has(o.letra) && fimIso >= hoje) {
-      o.reposicao = { data: hoje > iniMesIso ? hoje : iniMesIso, pos: null };
-    }
-  });
-  const alvo = todosRot.filter(o => {
-    const r = o.reposicao;
-    if (!unica(o) || !r || r.data > fimIso) return false;
-    // troca feita antes deste mês: só mexe se ele nem está no arquivo
-    return r.data >= iniMesIso || !noArquivo.has(o.letra);
-  });
-  if (!alvo.length) return;
-  const setAlvo = new Set(alvo.map(o => o.letra));
-
-  // posição no ciclo (relativa ao dia 1) de quem já está no rodízio, pra equilibrar
-  const inferidos = inferirEstadosDeEscala({ ano: res.ano, mes: res.mes, dias, escala: base },
-                                           ops.filter(o => noArquivo.has(o.letra) && !setAlvo.has(o.letra)));
-  const vazio = () => new Array(9).fill(0);
-  const cont = vazio(), contPolo = {};
-  todosRot.forEach(o => {
-    const e = inferidos[o.letra]; if (!e) return;
-    const ini = (((e.ciclo - dias) % 9) + 9) % 9;
-    cont[ini]++;
-    (contPolo[polo(o)] = contPolo[polo(o)] || vazio())[ini]++;
-  });
-  const meta = { '06-14': Number(S.metaM) || 8, '14-22': Number(S.metaT) || 8 };
-  const qtd = (t, d) => base[t][d].length;
-
-  alvo.forEach(o => {
-    const l = o.letra, r = o.reposicao;
-    const inicio = r.data >= iniMesIso ? Number(r.data.slice(8, 10)) : 1;
-    // a partir daqui ele sai de onde estava no arquivo
-    Object.keys(base).forEach(t => {
-      for (let d = inicio; d <= dias; d++) {
-        if (Array.isArray(base[t][d])) base[t][d] = base[t][d].filter(x => x !== l);
-      }
-    });
-    const cp = contPolo[polo(o)] = contPolo[polo(o)] || vazio();
-    let ini;
-    if (r.pos != null) {
-      const posNoInicio = (((r.pos + diasEntreIso(r.data, iso(res.ano, res.mes, inicio))) % 9) + 9) % 9;
-      ini = (((posNoInicio - (inicio - 1)) % 9) + 9) % 9;
-    } else {
-      ini = 0;
-      for (let p = 1; p < 9; p++) {
-        if (cont[p] < cont[ini] || (cont[p] === cont[ini] && cp[p] < cp[ini])) ini = p;
-      }
-      // congela a posição escolhida: das próximas vezes o resultado é o mesmo
-      r.pos = (ini + (inicio - 1)) % 9;
-      r.data = iso(res.ano, res.mes, inicio);
-    }
-    cont[ini]++; cp[ini]++;
-    res.cicloEncaixe[l] = ini;
-
-    // turno do dia anterior, pras 12h de descanso
-    let ontem = 'FOLGA';
-    if (inicio > 1) {
-      ontem = turnoDe({ escala: base }, l, inicio - 1) || 'FOLGA';
-    } else {
-      const dAnt = new Date(res.ano, res.mes - 1, 0);
-      const ant = S.historico[chaveMes(dAnt.getFullYear(), dAnt.getMonth() + 1)];
-      if (ant && ant.escala) ontem = turnoDe(ant, l, dAnt.getDate()) || 'FOLGA';
-    }
-    let turnoBloco = null;
-    for (let d = inicio; d <= dias; d++) {
-      const pos = (ini + d - 1) % 9;
-      if (pos >= 6) { turnoBloco = null; ontem = 'FOLGA'; base['FOLGA'][d].push(l); continue; }
-      if (!turnoBloco) {
-        // escolhe o turno do bloco: o que menos estoura a meta e, no empate, o mais vazio
-        const nota = t => {
-          let estoura = 0, soma = 0;
-          for (let d2 = d, p2 = pos; d2 <= dias && p2 < 6; d2++, p2++) {
-            if (qtd(t, d2) >= meta[t]) estoura++;
-            soma += qtd(t, d2);
-          }
-          return estoura * 1000 + soma;
-        };
-        turnoBloco = nota('14-22') < nota('06-14') ? '14-22' : '06-14';
-        if (!podeTrabalhar(ontem, turnoBloco)) turnoBloco = turnoBloco === '06-14' ? '14-22' : '06-14';
-      }
-      let t = turnoBloco;
-      if (!podeTrabalhar(ontem, t)) t = '14-22';
-      // turno já com a meta completa: vai pro 10-18 (se as 12h deixarem)
-      if (qtd(t, d) >= (meta[t] || 99) && podeTrabalhar(ontem, '10-18')) t = '10-18';
-      base[t][d].push(l);
-      ontem = t;
-    }
-  });
-}
-function diasEntreIso(a, b) { return Math.round((deIso(b) - deIso(a)) / 86400000); }
-/* Posição no ciclo 6x3 no dia `dataIso`, contando os dias que ele trabalhou
-   seguidos logo antes (em qualquer turno, inclusive MPS). Ex.: trabalhou
-   segunda e terça no MPS e trocou na quarta → quarta é o 3º dia do bloco
-   (posição 2), então ele trabalha mais 4 dias e folga 3. Se já tinha 6 ou
-   mais seguidos, começa pela folga. Sem histórico nenhum → null (o encaixe
-   escolhe a posição com menos gente). */
-function posicaoPeloHistorico(letra, dataIso) {
-  const base = deIso(dataIso);
-  let seguidos = 0;
-  for (let i = 1; i <= 9; i++) {
-    const x = new Date(base); x.setDate(x.getDate() - i);
-    const res = S.historico[chaveMes(x.getFullYear(), x.getMonth() + 1)];
-    const t = res && res.escala ? turnoDe(res, letra, x.getDate()) : null;
-    if (i === 1 && !t) return null;
-    if (!t || TURNOS_TRABALHO.indexOf(t) < 0) break;
-    seguidos++;
-  }
-  return Math.min(seguidos, 6);
-}
-function ehDoRodizio(o) { return classificar([o]).todosRot.length > 0; }
-/* Troca de polo que tira o operador de uma posição fixa (MPS / Aracaju-3) e
-   põe no rodízio: a escala se reorganiza sozinha a partir de HOJE, por cima
-   das edições manuais DELE (as dos outros ficam como estão). O que já passou
-   não muda. */
-function reorganizarAposTrocaDePolo(o) {
-  const hoje = paraIso(new Date());
-  const l = o.letra;
-  o.reposicao = { data: hoje, pos: posicaoPeloHistorico(l, hoje) };
-  // edições manuais dele de hoje em diante deixam de valer
-  Object.keys(S.manual).forEach(k => {
-    const [am, , dia] = k.split('|'); const [a, m] = am.split('-').map(Number);
-    if (iso(a, m, Number(dia)) < hoje) return;
-    if ((S.manual[k] || []).indexOf(l) >= 0) S.manual[k] = S.manual[k].filter(x => x !== l);
-  });
-  gerarTudo();
-  // célula travada por edição manual onde o gerador quer colocá-lo: ele entra
-  // nela (senão sumia naquele dia, porque a célula travada não muda)
-  let mudou = false;
-  Object.values(S.historico).forEach(res => {
-    if (!res || !res.base) return;
-    const tmp = { ano: res.ano, mes: res.mes, dias: res.dias, escala: clonar(res.base), overtime: {}, info: {} };
-    normalizarEscala(tmp); aplicarFixosDeCadastro(tmp, S.ops); aplicarAusencias(tmp, S.ops);
-    for (let d = 1; d <= res.dias; d++) {
-      if (iso(res.ano, res.mes, d) < hoje) continue;
-      const alvo = turnoDe(tmp, l, d); if (!alvo) continue;
-      const k = chaveManual(res, alvo, d);
-      if (k in S.manual && S.manual[k].indexOf(l) < 0) { S.manual[k].push(l); mudou = true; }
-    }
-  });
-  if (mudou) { ressincronizarTodosOsMeses(); desenharTudo(); }
-}
 function ressincronizarMes(res) {
   if (!res || !res.escala) return;
   normalizarEscala(res);
   garantirBase(res);
-  if (ehMesExterno(res)) recomporBaseExterna(res, S.ops);
   res.escala = clonar(res.base);
   normalizarEscala(res);
   aplicarFixosDeCadastro(res, S.ops);
@@ -2750,11 +2542,7 @@ function renomearLetra(antes, depois) {
     if (!res) return;
     varrerGrade(res.escala);
     varrerGrade(res.base);
-    varrerGrade(res.baseArquivo);
     varrerGrade(res.overtime);
-    if (res.cicloEncaixe && antes in res.cicloEncaixe && !(depois in res.cicloEncaixe)) {
-      res.cicloEncaixe[depois] = res.cicloEncaixe[antes]; delete res.cicloEncaixe[antes];
-    }
     if (res.estados && res.estados[antes] && !res.estados[depois]) {
       res.estados[depois] = res.estados[antes]; delete res.estados[antes];
     }
@@ -2820,35 +2608,6 @@ function gerarTudo(travarPassado) {
   limparAusenciasVencidas();
   const [a0, m0] = (S.mesIni || paraIso(new Date()).slice(0, 7)).split('-').map(Number);
   let estados = S.estadoInicial ? clonar(S.estadoInicial) : inicializarEstados(S.ops);
-  // Operador que entrou depois que o mês de referência foi carregado: ele é
-  // encaixado nesse mês (ver recomporBaseExterna) e o ponto de partida do mês
-  // seguinte passa a continuar o ciclo dele a partir dali — senão ele caía
-  // numa posição qualquer e o rodízio quebrava na virada do mês.
-  if (S.mesReferencia && S.estadoInicial) {
-    const ref = S.mesReferencia;
-    ref.externo = true;
-    ressincronizarMes(ref);
-    const [pa, pm] = proximoMes(ref.ano, ref.mes);
-    if (pa === a0 && pm === m0) {
-      const naGrade = letrasNaGrade(ref.base);
-      const inf = inferirEstadosDeEscala(ref, S.ops);
-      const enc = ref.cicloEncaixe || {};
-      Object.keys(inf).forEach(l => {
-        if (!naGrade.has(l)) return;
-        // encaixado no mês de fora: continua do ciclo que o encaixe escolheu
-        // (a inferência pela grade inteira se confundia com os dias de antes
-        // da mudança, ex.: quem vinha da linha MPS)
-        if (l in enc) {
-          const e = clonar(inf[l]); e.ciclo = (enc[l] + ref.dias) % 9;
-          S.estadoInicial[l] = e; estados[l] = clonar(e);
-          return;
-        }
-        if (S.estadoInicial[l]) return;
-        S.estadoInicial[l] = clonar(inf[l]);
-        estados[l] = clonar(inf[l]);
-      });
-    }
-  }
   // Vale tanto do zero quanto em cima do que foi inferido de um arquivo
   // carregado — só troca a posição de cada um no ciclo, sem mexer no último
   // turno real (então não afeta a segurança das 12h no 1º dia gerado).
@@ -2866,23 +2625,8 @@ function gerarTudo(travarPassado) {
       // partir do que está de fato nele.
       ressincronizarMes(existente);
       estados = garantirEstados(inferirEstadosDeEscala(existente, S.ops), S.ops);
-      // quem foi encaixado neste mês continua do ciclo que o encaixe escolheu
-      Object.keys(existente.cicloEncaixe || {}).forEach(l => {
-        if (estados[l]) estados[l].ciclo = (existente.cicloEncaixe[l] + existente.dias) % 9;
-      });
       meses.push(existente);
     } else {
-      // quem entrou no rodízio neste mês por troca de polo começa na posição
-      // calculada pelos dias que já tinha trabalhado (não estoura 6 seguidos)
-      S.ops.forEach(o => {
-        const r = o.reposicao; if (!r || r.pos == null) return;
-        const [ry, rm, rd] = r.data.split('-').map(Number);
-        if (ry !== a || rm !== m || !ehDoRodizio(o)) return;
-        estados = clonar(estados);
-        const e = estados[o.letra] ? estados[o.letra] : estadoPadrao(0);
-        e.ciclo = (((r.pos - (rd - 1)) % 9) + 9) % 9;
-        estados[o.letra] = e;
-      });
       const res = gerarMes(S.ops, a, m, estados);
       estados = res.estados;
       garantirBase(res);              // grade "limpa", antes de ausência/manual
@@ -3116,23 +2860,9 @@ function desenharEscala() {
   })));
   tfoot.appendChild(trf); t.appendChild(tfoot);
 }
-/* nome abreviado só pra exibição: primeiro nome completo + iniciais dos sobrenomes.
-   "AISLAN LIMA SANTOS" → "Aislan L. S." — partículas (de, da, dos...) são puladas.
-   O cadastro continua guardando o nome completo; busca e ordenação usam ele. */
-const PARTICULAS_NOME = new Set(['DE', 'DA', 'DO', 'DAS', 'DOS', 'E', 'D']);
-function nomeCurto(nome) {
-  const partes = String(nome || '').trim().split(/\s+/).filter(Boolean);
-  if (!partes.length) return '';
-  const maiusc = t => t.toLocaleUpperCase('pt-BR');
-  const primeiro = maiusc(partes[0].charAt(0)) + partes[0].slice(1).toLocaleLowerCase('pt-BR');
-  const iniciais = partes.slice(1)
-    .filter(p => !PARTICULAS_NOME.has(maiusc(p)))
-    .map(p => maiusc(p.charAt(0)) + '.');
-  return [primeiro, ...iniciais].join(' ');
-}
 function nomeDe(letra) {
   const o = S.ops.find(x => x.letra === letra);
-  return o ? `[${letra}] ${nomeCurto(o.nome)}` : `[${letra}] não cadastrado`;
+  return o ? `[${letra}] ${o.nome}` : `[${letra}] não cadastrado`;
 }
 
 /* ═══════════════ visão por operador ═══════════════ */
@@ -3247,7 +2977,7 @@ function desenharOperador() {
     const tdN = el('td', { class: 'col-op' });
     const n1 = el('span', { class: 'op-nome' });
     n1.appendChild(el('span', { class: 'selo-letra', text: o.letra }));
-    n1.appendChild(document.createTextNode(nomeCurto(o.nome)));
+    n1.appendChild(document.createTextNode(o.nome));
     tdN.appendChild(n1);
     const legendas = [o.tipo, o.aju_especial === 'Sim' ? 'AJU especial' : '', o.sem_madrugada ? 'sem madrugada' : ''].filter(Boolean);
     const sub = el('span', { class: 'op-sub', text: legendas.join(' · ') });
@@ -3271,7 +3001,7 @@ function desenharOperador() {
       const poloDia = turno ? poloDoDia(res, d, turno, o.letra) : '';
       const td = el('td', {
         class: 'mini ab-' + cls,
-        title: `${nomeCurto(o.nome)} · dia ${d}: ${turno ? ROTULO[turno] : 'Folga'}` + (poloDia ? `\nPolo do dia: ${poloDia}` : ''),
+        title: `${o.nome} · dia ${d}: ${turno ? ROTULO[turno] : 'Folga'}` + (poloDia ? `\nPolo do dia: ${poloDia}` : ''),
         text: ab
       });
       tr.appendChild(td);
@@ -3320,11 +3050,7 @@ function desenharCadastro() {
         // a geração futura — então reaplica nos meses que já existem
         const estrutural = ['principal', 'secundario', 'tipo', 'aju_especial'].indexOf(prop) >= 0;
         if (estrutural) registrarPasso();
-        const eraDoRodizio = ehDoRodizio(o);
         o[prop] = s.value;
-        // saiu do MPS pra um polo de rodízio mas o tipo ficou "MPS": ele
-        // continuaria preso na linha MPS, então o tipo volta a ser Formado
-        if (prop === 'principal' && s.value !== 'MPS' && o.tipo === 'MPS') o.tipo = 'Formado';
         // Se a prioridade daquele polo ainda estiver no padrão "sem definir"
         // (99), acompanha a troca de polo sugerindo a próxima da sequência.
         if (prop === 'principal' && Number(o.prioridade_polo_principal) === 99) {
@@ -3334,16 +3060,13 @@ function desenharCadastro() {
         }
         desenharCadastro();
         if (estrutural) {
-          // a escala se reorganiza sozinha a partir de hoje
-          if (!eraDoRodizio && ehDoRodizio(o)) reorganizarAposTrocaDePolo(o);
-          else gerarTudo();
+          ressincronizarTodosOsMeses();
+          desenharEscala(); desenharOperador(); desenharPainel();
           carimbarAtualizacao();
           const fixo = o.tipo === 'MPS' || polo(o) === 'MPS' || polo(o) === 'Aracaju - 3';
           aviso(fixo
-            ? `${nomeCurto(o.nome) || o.letra} reposicionado e escala reorganizada a partir de hoje.`
-            : !eraDoRodizio
-              ? `${nomeCurto(o.nome) || o.letra} entrou no rodízio 6x3 a partir de hoje, contando os dias que já tinha trabalhado.`
-              : 'Cadastro atualizado e escala reorganizada a partir de hoje.');
+            ? `${o.nome || o.letra} reposicionado em todos os meses guardados. Use "Gerar escala" pra redistribuir o rodízio de quem ficou.`
+            : 'Cadastro atualizado. Use "Gerar escala" pra recalcular o rodízio.');
         }
       };
       return s;
@@ -3437,7 +3160,7 @@ function desenharAusencias() {
   linhas.forEach(({ o, a, i }) => {
     const tr = el('tr');
     tr.appendChild(el('td', {}, [el('span', { class: 'selo-letra', text: o.letra })]));
-    tr.appendChild(el('td', { text: nomeCurto(o.nome) }));
+    tr.appendChild(el('td', { text: o.nome }));
 
     const tdM = el('td'); const sm = el('select');
     sm.disabled = !S.editando;
@@ -3564,7 +3287,7 @@ function desenharPainel() {
   S.ops.slice().sort((a, b) => trab[b.letra] - trab[a.letra]).forEach(o => {
     const tr = el('tr');
     tr.appendChild(el('td', {}, [el('span', { class: 'selo-letra', text: o.letra })]));
-    tr.appendChild(el('td', { text: nomeCurto(o.nome) }));
+    tr.appendChild(el('td', { text: o.nome }));
     tr.appendChild(el('td', { text: polo(o) }));
     tr.appendChild(el('td', {}, [el('span', {
       class: 'selo ' + (o.tipo === 'Assistido' ? 'info' : o.tipo === 'MPS' ? 'aviso' : 'neutro'), text: o.tipo || '—'
@@ -3603,7 +3326,7 @@ function desenharPainel() {
   rank.forEach(o => {
     const l = el('div', { class: 'md-linha', style: 'display:flex;align-items:center;gap:9px;margin:3px 0' });
     l.appendChild(el('span', { class: 'selo-letra', text: o.letra }));
-    l.appendChild(el('span', { class: 'md-nome', style: 'font-size:12px;width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap', text: nomeCurto(o.nome) }));
+    l.appendChild(el('span', { class: 'md-nome', style: 'font-size:12px;width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap', text: o.nome }));
     const trilho = el('div', { class: 'trilho' });
     trilho.appendChild(el('div', { class: 'barra', style: `width:${Math.round(madr[o.letra] / maxN * 100)}%` }));
     l.appendChild(trilho);
@@ -3619,7 +3342,7 @@ function desenharPainel() {
   ausMes.sort((x, y) => (x.a.inicio || '').localeCompare(y.a.inicio || '')).forEach(({ o, a }) => {
     const l = el('div', { style: 'display:flex;align-items:center;gap:9px;margin:4px 0;font-size:12.5px' });
     l.appendChild(el('span', { class: 'selo-letra', text: o.letra }));
-    l.appendChild(el('span', { style: 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap', text: nomeCurto(o.nome) }));
+    l.appendChild(el('span', { style: 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap', text: o.nome }));
     l.appendChild(el('span', { class: 'selo ' + (a.motivo === 'Férias' ? 'ok' : 'aviso'), text: a.motivo }));
     l.appendChild(el('span', { style: 'font-family:var(--mono);font-size:11.5px;color:var(--ink-3)', text: `${br(a.inicio)} → ${br(a.fim)}` }));
     corpo3b.appendChild(l);
@@ -3820,7 +3543,7 @@ async function exportarRelatorioPDF() {
     y = novaPagina('Dias trabalhados, madrugadas e horas extras', 'Um operador por linha, ordenado do maior para o menor número de dias trabalhados.');
     const listaOrdenada = S.ops.slice().sort((a, b) => trab[b.letra] - trab[a.letra]);
     tabela(['Letra', 'Operador', 'Polo', 'Tipo', 'Dias', 'Madr.', 'Extra'],
-      listaOrdenada.map(o => [o.letra, nomeCurto(o.nome), polo(o) || '—', o.tipo || '—', String(trab[o.letra]), String(madr[o.letra]), String(extra[o.letra])]),
+      listaOrdenada.map(o => [o.letra, o.nome, polo(o) || '—', o.tipo || '—', String(trab[o.letra]), String(madr[o.letra]), String(extra[o.letra])]),
       y, { columnStyles: { 0: { cellWidth: 12 }, 4: { cellWidth: 14, halign: 'right' }, 5: { cellWidth: 14, halign: 'right' }, 6: { cellWidth: 14, halign: 'right' } } });
 
     // ---------- PÁGINA 3: distribuição percentual por polo/regional (ranqueado) ----------
@@ -3830,7 +3553,7 @@ async function exportarRelatorioPDF() {
       S.ops.slice().sort((a, b) => a.nome.localeCompare(b.nome)).map(o => {
         const ranking = topPolosOperador(contRegional[o.letra] || {}, trab[o.letra]);
         const celulas = [0, 1, 2, 3, 4].map(i => ranking[i] ? `${ranking[i].sigla} - ${ranking[i].pct.toFixed(0)}%` : '-');
-        return [o.letra, nomeCurto(o.nome), ...celulas];
+        return [o.letra, o.nome, ...celulas];
       }), y, {
         styles: { fontSize: 8.5, halign: 'center' },
         headStyles: { fillColor: INK, textColor: 255, fontStyle: 'bold', fontSize: 8.5, halign: 'center' },
@@ -3849,13 +3572,13 @@ async function exportarRelatorioPDF() {
     } else {
       const img = graficoBase64({
         type: 'bar',
-        data: { labels: rankOtMes.map(o => nomeCurto(o.nome)), datasets: [{ label: 'Horas extras', data: rankOtMes.map(o => extra[o.letra]), backgroundColor: '#b8322c' }] },
+        data: { labels: rankOtMes.map(o => o.nome), datasets: [{ label: 'Horas extras', data: rankOtMes.map(o => extra[o.letra]), backgroundColor: '#b8322c' }] },
         options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { precision: 0 } } } }
       }, 1000, Math.max(260, rankOtMes.length * 42));
       const alturaImg = Math.max(70, rankOtMes.length * 8);
       doc.addImage(img, 'PNG', MX, y, PW - MX * 2, alturaImg);
       y += alturaImg + 8;
-      tabela(['Letra', 'Operador', 'Horas extras'], rankOtMes.map(o => [o.letra, nomeCurto(o.nome), String(extra[o.letra])]), y, { columnStyles: { 0: { cellWidth: 16 }, 2: { cellWidth: 30, halign: 'right' } } });
+      tabela(['Letra', 'Operador', 'Horas extras'], rankOtMes.map(o => [o.letra, o.nome, String(extra[o.letra])]), y, { columnStyles: { 0: { cellWidth: 16 }, 2: { cellWidth: 30, halign: 'right' } } });
     }
 
     // ---------- PÁGINA 5: ranking de madrugadas (mês atual) ----------
@@ -3866,7 +3589,7 @@ async function exportarRelatorioPDF() {
     } else {
       const img = graficoBase64({
         type: 'bar',
-        data: { labels: rankMadrMes.map(o => nomeCurto(o.nome)), datasets: [{ label: 'Madrugadas', data: rankMadrMes.map(o => madr[o.letra]), backgroundColor: '#563095' }] },
+        data: { labels: rankMadrMes.map(o => o.nome), datasets: [{ label: 'Madrugadas', data: rankMadrMes.map(o => madr[o.letra]), backgroundColor: '#563095' }] },
         options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { precision: 0 } } } }
       }, 1000, Math.max(260, rankMadrMes.length * 42));
       const alturaImg = Math.max(70, rankMadrMes.length * 8);
@@ -3890,7 +3613,7 @@ async function exportarRelatorioPDF() {
       y += 52;
       y = tabela(['Letra', 'Operador', 'Motivo', 'Início', 'Fim', 'Dias'],
         ausMes.sort((x, z) => (x.a.inicio || '').localeCompare(z.a.inicio || '')).map(({ o, a }) => [
-          o.letra, nomeCurto(o.nome), a.motivo, br(a.inicio), br(a.fim), String(diasAusenciaNoMes(a, res.ano, res.mes, res.dias))
+          o.letra, o.nome, a.motivo, br(a.inicio), br(a.fim), String(diasAusenciaNoMes(a, res.ano, res.mes, res.dias))
         ]), y, { columnStyles: { 0: { cellWidth: 14 }, 5: { cellWidth: 14, halign: 'right' } } });
     }
 
@@ -3961,7 +3684,7 @@ async function exportarRelatorioPDF() {
           doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(CINZA[0], CINZA[1], CINZA[2]);
           doc.text('Sem registros no período.', MX, y); doc.setTextColor(INK[0], INK[1], INK[2]); y += 8; return;
         }
-        y = tabela(['#', 'Operador', unidade], lista.map(o => [o.letra, nomeCurto(o.nome), String(mapa[o.letra])]), y,
+        y = tabela(['#', 'Operador', unidade], lista.map(o => [o.letra, o.nome, String(mapa[o.letra])]), y,
           { columnStyles: { 0: { cellWidth: 10 }, 2: { cellWidth: 30, halign: 'right' } }, headStyles: { fillColor: cor, textColor: 255, fontStyle: 'bold', fontSize: 8 } });
       }
       podio('Quem mais fez horas extras', topOt, acumOtOp, 'Horas extras', VERM);
@@ -4298,7 +4021,7 @@ function abaOperador(res) {
     (RANK_POLO[polo(a)] ?? 99) - (RANK_POLO[polo(b)] ?? 99) || a.nome.localeCompare(b.nome));
   const turnos = [];
   ordenados.forEach(o => {
-    const l = [o.letra, nomeCurto(o.nome), polo(o), o.tipo || ''];
+    const l = [o.letra, o.nome, polo(o), o.tipo || ''];
     const seq = [];
     let t2 = 0, n = 0;
     for (let d = 1; d <= dias; d++) {
@@ -4345,7 +4068,7 @@ function abaCadastro() {
   const cab = ['Letra', 'Nome', 'Login', 'Polo principal', 'Polo secundário', 'Tipo', 'AJU especial', 'Sem madrugada'];
   const linhas = [['CADASTRO DE OPERADORES'], [xlsCarimbo()], [], cab];
   S.ops.slice().sort((a, b) => a.nome.localeCompare(b.nome)).forEach(o =>
-    linhas.push([o.letra, nomeCurto(o.nome), o.login || '', polo(o), o.secundario || '', o.tipo || '',
+    linhas.push([o.letra, o.nome, o.login || '', polo(o), o.secundario || '', o.tipo || '',
                  o.aju_especial || 'Não', o.sem_madrugada ? 'Sim' : 'Não']));
   const ws = XLSX.utils.aoa_to_sheet(linhas);
   ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: linhas.length - 1, c: cab.length - 1 } });
@@ -4775,7 +4498,7 @@ $('#btConfirmarImportar').onclick = () => {
     // marca como "veio de fora": a geração não escreve por cima dele, só
     // reaplica ausências/edições em cima da grade importada
     cand.dados.externo = true;
-    delete cand.dados.base; delete cand.dados.baseArquivo; delete cand.dados.cicloEncaixe; delete cand.dados.reposAplicada;
+    delete cand.dados.base;
     S.historico[cand.chave] = cand.dados;
     Object.assign(S.manual, cand.manualFiltrado);
     Object.assign(S.corManual, cand.corManualFiltrado);
@@ -4960,12 +4683,7 @@ function normalizarOp(o) {
     prioridade_aju: Number(o.prioridade_aju ?? 99),
     prioridade_polo_principal: Number(o.prioridade_polo_principal ?? 99),
     prioridade_polo_secundario: Number(o.prioridade_polo_secundario ?? 99),
-    ausencias: (o.ausencias || []).map(a => ({ inicio: a.inicio || '', fim: a.fim || '', motivo: a.motivo || 'Férias' })),
-    // entrada no rodízio vinda de posição fixa (ex.: MPS → polo): data da troca e
-    // posição no ciclo 6x3 nesse dia, calculada pelos dias que ele já tinha trabalhado
-    ...(o.reposicao && o.reposicao.data
-      ? { reposicao: { data: o.reposicao.data, pos: o.reposicao.pos == null ? null : Number(o.reposicao.pos) } }
-      : {})
+    ausencias: (o.ausencias || []).map(a => ({ inicio: a.inicio || '', fim: a.fim || '', motivo: a.motivo || 'Férias' }))
   };
 }
 
@@ -5363,7 +5081,7 @@ $('#btMesExterno').onclick = () => {
   if (!confirm(`Liberar ${MESES[atual.mes - 1]} de ${atual.ano} para ser regerado?\n\nA grade que veio do arquivo externo será substituída pela gerada pelo rodízio (as edições manuais e as ausências continuam sendo aplicadas por cima).`)) return;
   registrarPasso();
   delete atual.externo;
-  delete atual.base; delete atual.baseArquivo; delete atual.cicloEncaixe; delete atual.reposAplicada;
+  delete atual.base;
   if (S.mesReferencia && S.mesReferencia === atual) S.mesReferencia = null;
   gerarTudo(false);
   carimbarAtualizacao();
@@ -5505,7 +5223,7 @@ function abrirModalAus(letraPre, diaIso) {
   if (!S.ops.length) return;
   const sel = $('#ausOp'); sel.innerHTML = '';
   S.ops.slice().sort((a, b) => a.nome.localeCompare(b.nome))
-    .forEach(o => sel.appendChild(el('option', { value: o.letra, text: `${o.letra} — ${nomeCurto(o.nome)}` })));
+    .forEach(o => sel.appendChild(el('option', { value: o.letra, text: `${o.letra} — ${o.nome}` })));
   if (letraPre && S.ops.some(o => o.letra === letraPre)) sel.value = letraPre;
   const sm = $('#ausMotivo'); sm.innerHTML = '';
   MOTIVOS.forEach(m => sm.appendChild(el('option', { value: m, text: m })));
@@ -5528,7 +5246,7 @@ $('#ausSalvar').onclick = () => {
   op.ausencias.push({ inicio: ini, fim, motivo: $('#ausMotivo').value });
   fecharAus();
   desenharAusencias(); desenharCadastro(); gerarTudo(); carimbarAtualizacao();
-  aviso(`Ausência registrada para ${nomeCurto(op.nome)}.`);
+  aviso(`Ausência registrada para ${op.nome}.`);
 };
 document.addEventListener('click', e => {
   if (!S.editando) return;
@@ -5973,7 +5691,7 @@ function desenharInformacoes() {
   S.ops.slice().sort((a, b) => a.nome.localeCompare(b.nome)).forEach(o => {
     const tr = el('tr');
     tr.appendChild(el('td', {}, [el('span', { class: 'selo-letra', text: o.letra })]));
-    tr.appendChild(el('td', { text: nomeCurto(o.nome) }));
+    tr.appendChild(el('td', { text: o.nome }));
     tr.appendChild(el('td', { style: 'font-family:var(--mono)', text: o.login || '—' }));
     tr.appendChild(el('td', {}, [el('span', {
       class: 'selo ' + (o.tipo === 'Assistido' ? 'info' : o.tipo === 'MPS' ? 'ok' : 'neutro'), text: o.tipo || 'Formado' })]));
