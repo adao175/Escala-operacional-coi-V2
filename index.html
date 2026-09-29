@@ -689,6 +689,7 @@ body.foco-ativo{overflow:hidden}
     na ordem da coluna <i>Prioridade AJU-1</i>. <b>Sem madrugada</b> impede o turno 22-06.
     <b>Pega 2 madrugadas</b> dá preferência ao operador para fechar o bloco com duas noites seguidas (posições 4 e 5),
     sempre respeitando o teto de 6 madrugadas por mês — os demais continuam podendo pegar madrugada normalmente, só não são priorizados para dobrar.
+    <b>Regra:</b> ninguém faz mais de 2 madrugadas por ciclo 6x3 (qualquer janela de 9 dias), nem com hora extra.
     <b>Ordem</b> é o desempate na exibição dentro do mesmo polo.
     Nome, login, polos, tipo, remoção e demais campos só entram na escala depois de clicar em <b>Salvar alterações</b>.
   </p>
@@ -1648,6 +1649,12 @@ const MOTIVOS = Object.keys(MOTIVO_TURNO);
 const PREF_DUAS_MADRUGADAS = new Set(["N", "M", "W", "B", "O", "R", "K", "2"]);
 // Teto de madrugadas por operador no mês, mesmo para quem topa dobrar.
 const LIMITE_MADRUGADAS_MES = 6;
+// REGRA: cada operador faz no máximo 2 madrugadas por ciclo 6x3. Como o ciclo
+// tem 9 dias (6 de trabalho + 3 de folga), a checagem é feita em qualquer
+// janela de 9 dias corridos — assim vale também na virada do mês e para hora
+// extra puxada da folga (antes dava pra fazer N N F F N, 3 madrugadas no ciclo).
+const MAX_MADRUGADAS_CICLO = 2;
+const JANELA_CICLO = 9;
 
 // Após o turno X, o que fica proibido no dia seguinte (descanso de 12h)
 const BLOQUEIO = {
@@ -1782,7 +1789,7 @@ function polo(op) { return (op.principal || '').trim(); }
 function datasAusencia(op) {
   const s = new Set();
   (op.ausencias || []).forEach(a => {
-    if (!a.inicio || !a.fim) return;
+    if (!dataIsoValida(a.inicio) || !dataIsoValida(a.fim)) return;
     let i = deIso(a.inicio); const f = deIso(a.fim);
     let guarda = 0;
     while (i <= f && guarda++ < 800) { s.add(paraIso(i)); i.setDate(i.getDate() + 1); }
@@ -1795,7 +1802,8 @@ function classificar(ops) {
   const mps    = ops.filter(o => o.tipo === 'MPS' || polo(o) === 'MPS');
   const fixos3 = ops.filter(o => polo(o) === 'Aracaju - 3' && o.tipo !== 'MPS');
   const fixos1 = ops.filter(o => polo(o) === 'Aracaju - 1' && o.aju_especial !== 'Sim' && o.tipo !== 'MPS');
-  const ajuEsp = ops.filter(o => o.aju_especial === 'Sim' && POLOS_ROTATIVOS.has(polo(o)));
+  const ajuEsp = ops.filter(o => o.aju_especial === 'Sim' && POLOS_ROTATIVOS.has(polo(o))
+                                 && o.tipo !== 'MPS');
   const rotat  = ops.filter(o => POLOS_ROTATIVOS.has(polo(o)) && o.aju_especial !== 'Sim'
                                  && o.tipo !== 'MPS' && polo(o) !== 'Aracaju - 1');
   return { mps, fixos3, fixos1, ajuEsp, todosRot: rotat.concat(ajuEsp) };
@@ -2049,12 +2057,15 @@ function garantirEstados(estados, ops) {
    descanso desde o último turno de cada um no dia anterior (mesma tabela
    BLOQUEIO que a engine já usa pra tudo o mais) — se não der pros dois
    lados, a troca simplesmente não acontece. */
-const TURNOS_REALOC = ['06-14', '14-22', '10-18'];
+const TURNOS_REALOC_PADRAO = ['06-14', '14-22', '10-18'];
 
-function realocarPorPolo(escala, overtime, d, prev, turnoOntem, info, rotSet, pessoalM, pessoalT) {
+function realocarPorPolo(escala, overtime, d, prev, turnoOntem, info, rotSet, pessoalM, pessoalT, turnosOk, presos, compat) {
+  const cabeAmanha = compat || (() => true);
+  const TURNOS_REALOC = (turnosOk || TURNOS_REALOC_PADRAO);
   const sigBase = l => (info[l] || {}).p || '';
   const porTurno = {};
-  TURNOS_REALOC.forEach(t => { porTurno[t] = (escala[t][d] || []).filter(l => rotSet.has(l)); });
+  if (TURNOS_REALOC.length < 2) return;
+  TURNOS_REALOC.forEach(t => { porTurno[t] = (escala[t][d] || []).filter(l => rotSet.has(l) && !(presos && presos.has(l))); });
 
   const trocar = (t1, l1, t2, l2) => {
     const i1 = escala[t1][d].indexOf(l1); if (i1 >= 0) escala[t1][d].splice(i1, 1);
@@ -2096,6 +2107,8 @@ function realocarPorPolo(escala, overtime, d, prev, turnoOntem, info, rotSet, pe
         // 12h de descanso nos dois sentidos, a partir do turno de ontem de cada um
         if (!podeTrabalhar(turnoOntem[l] || 'FOLGA', turnoAchou)) continue;
         if (!podeTrabalhar(turnoOntem[achou] || 'FOLGA', t)) continue;
+        // e também até o turno travado de amanhã, se houver
+        if (!cabeAmanha(l, turnoAchou) || !cabeAmanha(achou, t)) continue;
         trocar(t, l, turnoAchou, achou);
         porTurno[t] = porTurno[t].filter(x => x !== l).concat([achou]);
         porTurno[turnoAchou] = porTurno[turnoAchou].filter(x => x !== achou).concat([l]);
@@ -2118,9 +2131,24 @@ function realocarPorPolo(escala, overtime, d, prev, turnoOntem, info, rotSet, pe
    equipe está de verdade — antes, ao incluir/alterar alguém, o gerador
    "reinventava" o passado e o dia de hoje saía com 12h estouradas, dupla de
    madrugada quebrada, blocos com 7-8 dias etc. */
-function gerarMes(ops, ano, mes, estadosExt, travas) {
+/* `presas` (opcional): dia -> { turno: [letras] } com as células editadas à
+   mão nos dias que AINDA NÃO passaram. Antes o gerador ignorava essas células:
+   montava o dia como se elas não existissem e só depois a edição manual era
+   jogada por cima — quem o gerador tinha posto naquela célula simplesmente
+   sumia do dia (as letras "sumindo"), e quem estava travado nela podia ficar
+   com 12h estouradas ou 3 madrugadas. Agora o gerador trata essas células como
+   fixas: quem está nelas fica ali, ninguém mais entra nelas, e o resto do dia é
+   montado em volta.
+   `anteriorRes` (opcional): o mês anterior já pronto, pra contar as madrugadas
+   dos últimos dias dele na regra de no máximo 2 por ciclo.
+   `versaoAnterior` (opcional): a grade deste mesmo mês antes de gerar de novo.
+   Na hora de escolher entre manhã e tarde, quem já estava num desses turnos
+   continua nele (se couber) — assim alterar UM operador não embaralha a
+   manhã/tarde de todo mundo. */
+function gerarMes(ops, ano, mes, estadosExt, travas, presas, anteriorRes, versaoAnterior) {
   ops = opsDaEscala(ops);
   const trava = d => (travas && travas[d]) || null;
+  const presa = d => (!trava(d) && presas && presas[d]) || null;
   const dias = diasNoMes(ano, mes);
   const escala = {}, overtime = {};
   TURNOS.forEach(t => {
@@ -2142,6 +2170,74 @@ function gerarMes(ops, ano, mes, estadosExt, travas) {
     prioP: Number(o.prioridade_polo_principal ?? 99),
   });
   const rotSetPolo = new Set(todosRot.map(o => o.letra));
+
+  // Células travadas de cada dia (já sem quem está ausente naquele dia) e o
+  // conjunto de quem está preso em alguma delas.
+  const travadasDia = {}, presosDia = {};
+  for (let d = 1; d <= dias; d++) {
+    const pd = presa(d);
+    if (!pd) continue;
+    travadasDia[d] = {}; presosDia[d] = new Set();
+    Object.keys(pd).forEach(t => {
+      if (!escala[t]) return;
+      const lst = (pd[t] || []).filter(l => !ausente(l, d));
+      travadasDia[d][t] = lst;
+      lst.forEach(l => presosDia[d].add(l));
+    });
+  }
+  const bloqueado = (d, t) => !!(travadasDia[d] && travadasDia[d][t]);
+  const preso = (d, l) => !!(presosDia[d] && presosDia[d].has(l));
+  // turno em que a pessoa está travada AMANHÃ (se estiver): o turno de hoje
+  // precisa deixar as 12h de descanso até ele
+  const turnoPresoAmanha = (l, d) => {
+    if (!preso(d + 1, l)) return null;
+    return TURNOS_TRABALHO.find(t => (travadasDia[d + 1][t] || []).indexOf(l) >= 0) || null;
+  };
+  const compat = (l, d, t) => { const am = turnoPresoAmanha(l, d); return !am || podeTrabalhar(t, am); };
+
+  // Madrugadas de cada um por dia (índice do dia no mês; o mês anterior entra
+  // como 0, -1, -2...). É o que garante no máximo MAX_MADRUGADAS_CICLO em
+  // qualquer janela de JANELA_CICLO dias.
+  const noites = {}; ops.forEach(o => noites[o.letra] = new Set());
+  if (anteriorRes && anteriorRes.escala && anteriorRes.escala['22-06']) {
+    for (let k = 0; k < JANELA_CICLO - 1; k++) {
+      const dd = anteriorRes.dias - k;
+      if (dd < 1) break;
+      (anteriorRes.escala['22-06'][dd] || []).forEach(l => { if (noites[l]) noites[l].add(-k); });
+    }
+  }
+  const cabeNoite = (l, d, extras) => {
+    const s = noites[l]; if (!s) return true;
+    const novos = [d].concat(extras || []);
+    const todos = new Set(s); novos.forEach(x => todos.add(x));
+    for (const x of novos) {
+      for (let ini = x - JANELA_CICLO + 1; ini <= x; ini++) {
+        let c = 0;
+        todos.forEach(y => { if (y >= ini && y < ini + JANELA_CICLO) c++; });
+        if (c > MAX_MADRUGADAS_CICLO) return false;
+      }
+    }
+    return true;
+  };
+  const marcaNoite = (l, d) => { if (noites[l]) noites[l].add(d); };
+  // Hora extra num dia de folga não pode emendar com o bloco e passar de 6
+  // dias seguidos de trabalho (folga na 1ª ou na 3ª posição do descanso).
+  const trabalhouNoDia = (l, d) => {
+    if (d >= 1) return TURNOS_TRABALHO.some(t => (escala[t][d] || []).indexOf(l) >= 0);
+    if (!anteriorRes || !anteriorRes.escala) return false;
+    const dd = anteriorRes.dias + d;
+    return dd >= 1 && TURNOS_TRABALHO.some(t => ((anteriorRes.escala[t] || {})[dd] || []).indexOf(l) >= 0);
+  };
+  const criaMaisDe6 = (l, d) => {
+    let antes = 0; for (let x = d - 1; x > d - 7 && trabalhouNoDia(l, x); x--) antes++;
+    let depois = 0;
+    for (let x = d + 1; x <= dias && depois < 6; x++) {
+      const p = (blk[l] || {})[x];
+      if (p === null || p === undefined || p >= 6) break;
+      depois++;
+    }
+    return antes + 1 + depois > 6;
+  };
 
   let estados = estadosExt ? clonar(estadosExt) : inicializarEstados(ops);
   estados = garantirEstados(estados, ops);
@@ -2180,6 +2276,7 @@ function gerarMes(ops, ano, mes, estadosExt, travas) {
   for (let d = 1; d <= dias; d++) {
     if (trava(d)) {
       // dia que já passou: a madrugada é a que de fato aconteceu
+      ((trava(d).escala || {})['22-06'] || []).forEach(l => marcaNoite(l, d));
       const reais = ((trava(d).escala || {})['22-06'] || []).filter(l => rotLetras.has(l));
       reais.forEach(l => { nCount[l]++; nMes[l]++; });
       nAssign[d] = reais;
@@ -2188,40 +2285,60 @@ function gerarMes(ops, ano, mes, estadosExt, travas) {
       forcarN = new Set(reais.filter(l => blk[l][d] === 4 && ontemReais.indexOf(l) < 0 && !semMadr.has(l)));
       continue;
     }
-    const trabalhando = todosRot.filter(o => blk[o.letra][d] !== null && blk[o.letra][d] < 6);
+    if (bloqueado(d, '22-06')) {
+      // madrugada editada à mão: quem está nela é quem faz, e mais ninguém
+      const fixos = travadasDia[d]['22-06'];
+      fixos.forEach(l => marcaNoite(l, d));
+      const reais = fixos.filter(l => rotLetras.has(l));
+      reais.forEach(l => { nCount[l]++; nMes[l]++; });
+      nAssign[d] = reais;
+      forcarN = new Set(reais.filter(l => blk[l][d] === 4 && !noites[l].has(d - 1) && !semMadr.has(l)
+                                          && cabeNoite(l, d + 1)));
+      continue;
+    }
+    // quem está preso numa célula editada à mão hoje não entra na disputa
+    const trabalhando = todosRot.filter(o => blk[o.letra][d] !== null && blk[o.letra][d] < 6 && !preso(d, o.letra)
+                                             && compat(o.letra, d, '22-06'));
     const noHoje = [];
     forcarN.forEach(l => {
-      if (trabalhando.some(o => o.letra === l)) { noHoje.push(l); nCount[l]++; nMes[l]++; }
+      if (noHoje.length >= S.metaN) return;
+      if (trabalhando.some(o => o.letra === l) && cabeNoite(l, d)) {
+        noHoje.push(l); nCount[l]++; nMes[l]++; marcaNoite(l, d);
+      }
     });
     forcarN = new Set();
 
     const ord = (a, b) => (nMes[a.letra] - nMes[b.letra])
       || (nCount[a.letra] - nCount[b.letra]) || (idxLetra[a.letra] - idxLetra[b.letra]);
     // teto mensal: quem já bateu LIMITE_MADRUGADAS_MES não entra mais na disputa.
-    const podeMais = o => nMes[o.letra] < LIMITE_MADRUGADAS_MES;
+    const podeMais = o => nMes[o.letra] < LIMITE_MADRUGADAS_MES && cabeNoite(o.letra, d);
     const prim = trabalhando.filter(o => blk[o.letra][d] === 5 && noHoje.indexOf(o.letra) < 0 && !semMadr.has(o.letra) && podeMais(o)).sort(ord);
     const sec  = trabalhando.filter(o => blk[o.letra][d] === 4 && noHoje.indexOf(o.letra) < 0 && !semMadr.has(o.letra) && podeMais(o)).sort(ord);
 
     // Quem "pega duas madrugadas" e ainda cabe no teto é priorizado já na
     // posição 4, fechando as duas noites seguidas do bloco — mas só até o
     // teto DIÁRIO (S.metaN), nunca estourando a madrugada.
-    const secPreferidos = sec.filter(o => duasMadr.has(o.letra) && nMes[o.letra] + 2 <= LIMITE_MADRUGADAS_MES).sort(ord);
+    // a dupla (hoje + amanhã) precisa caber inteira na regra do ciclo
+    const secPreferidos = sec.filter(o => duasMadr.has(o.letra) && nMes[o.letra] + 2 <= LIMITE_MADRUGADAS_MES
+                                          && cabeNoite(o.letra, d, [d + 1])).sort(ord);
     const secComuns = sec.filter(o => secPreferidos.indexOf(o) < 0);
 
     for (const o of secPreferidos) {
       if (noHoje.length >= S.metaN) break;
-      noHoje.push(o.letra); nCount[o.letra]++; nMes[o.letra]++; forcarN.add(o.letra);
+      noHoje.push(o.letra); nCount[o.letra]++; nMes[o.letra]++; marcaNoite(o.letra, d); forcarN.add(o.letra);
     }
     for (const o of prim) {
       if (noHoje.length >= S.metaN) break;
       if (noHoje.indexOf(o.letra) >= 0) continue;
-      noHoje.push(o.letra); nCount[o.letra]++; nMes[o.letra]++;
+      noHoje.push(o.letra); nCount[o.letra]++; nMes[o.letra]++; marcaNoite(o.letra, d);
     }
     if (noHoje.length < S.metaN && trabalhando.length) {
       for (const o of secComuns) {
         if (noHoje.length >= S.metaN) break;
         if (noHoje.indexOf(o.letra) >= 0) continue;
-        noHoje.push(o.letra); nCount[o.letra]++; nMes[o.letra]++; forcarN.add(o.letra);
+        noHoje.push(o.letra); nCount[o.letra]++; nMes[o.letra]++; marcaNoite(o.letra, d);
+        // só vira dupla se a 2ª noite também couber no ciclo
+        if (cabeNoite(o.letra, d + 1)) forcarN.add(o.letra);
       }
     }
     nAssign[d] = noHoje;
@@ -2271,25 +2388,59 @@ function gerarMes(ops, ano, mes, estadosExt, travas) {
       continue;
     }
 
+    // Células editadas à mão neste dia: entram primeiro e ficam fixas.
+    const bloq = t => bloqueado(d, t);
+    const presosHoje = presosDia[d] || new Set();
+    if (travadasDia[d]) {
+      Object.keys(travadasDia[d]).forEach(t => { escala[t][d] = travadasDia[d][t].slice(); });
+      todosRot.forEach(o => {
+        const l = o.letra;
+        if (!presosHoje.has(l)) return;
+        if (blk[l][d] === 0) { pessoalM[l] = 0; pessoalT[l] = 0; }
+        const t = TURNOS_TRABALHO.find(tt => escala[tt][d].indexOf(l) >= 0);
+        if (t) {
+          prev[l] = t;
+          seguidas[l] = t === '22-06' ? seguidas[l] + 1 : 0;
+          if (t === '06-14') pessoalM[l]++; else if (t === '14-22') pessoalT[l]++;
+          // folga + turno na mesma data = hora extra (igual ao editor)
+          if (escala['FOLGA'][d].indexOf(l) >= 0) {
+            escala['FOLGA'][d] = escala['FOLGA'][d].filter(x => x !== l);
+            if (overtime[t][d].indexOf(l) < 0) overtime[t][d].push(l);
+          }
+        } else {
+          prev[l] = 'FOLGA'; seguidas[l] = 0;
+        }
+      });
+    }
+    // coloca alguém numa linha sem capacidade (MPS, 08-17, folga) — mesmo que
+    // ela esteja travada, a pessoa não pode sumir do dia
+    const poeFixo = (l, t) => { if (!presosHoje.has(l) && escala[t][d].indexOf(l) < 0) escala[t][d].push(l); };
+
     // MPS — horário comercial
-    mps.forEach(o => { if (!ausente(o.letra, d)) escala[util ? 'MPS' : 'FOLGA'][d].push(o.letra); });
+    mps.forEach(o => { if (!ausente(o.letra, d)) poeFixo(o.letra, util ? 'MPS' : 'FOLGA'); });
 
     // Aracaju-3 — fixo 08-17 de segunda a sexta
     fixos3.forEach(o => {
       if (ausente(o.letra, d)) return;
-      escala[!ehFds(ano, mes, d) ? '08-17' : 'FOLGA'][d].push(o.letra);
+      poeFixo(o.letra, !ehFds(ano, mes, d) ? '08-17' : 'FOLGA');
     });
 
-    // Fixos do Aracaju-1 — alternam manhã/tarde por semana par/ímpar
+    // Fixos do Aracaju-1 — alternam manhã/tarde por semana par/ímpar.
+    // Antes só os 2 primeiros entravam (slice(0, 2)): quem passava a ser o 3º
+    // fixo do Aracaju-1 ao trocar de polo sumia da escala nos dias úteis.
     if (!fdsFer) {
-      const disp = fixos1.filter(o => !ausente(o.letra, d)).sort((a, b) => idxLetra[a.letra] - idxLetra[b.letra]);
+      const disp = fixos1.filter(o => !ausente(o.letra, d) && !presosHoje.has(o.letra))
+        .sort((a, b) => idxLetra[a.letra] - idxLetra[b.letra]);
       const par = semanaIso(new Date(ano, mes - 1, d)) % 2 === 0;
-      disp.slice(0, 2).forEach((o, i) => {
-        const t = par ? (i === 0 ? '06-14' : '14-22') : (i === 0 ? '14-22' : '06-14');
+      disp.forEach((o, i) => {
+        let t = par ? (i % 2 === 0 ? '06-14' : '14-22') : (i % 2 === 0 ? '14-22' : '06-14');
+        if (bloq(t)) t = t === '06-14' ? '14-22' : '06-14';
+        if (bloq(t)) t = '10-18';
+        if (bloq(t)) t = 'FOLGA';
         escala[t][d].push(o.letra);
       });
     } else {
-      fixos1.forEach(o => { if (!ausente(o.letra, d)) escala['FOLGA'][d].push(o.letra); });
+      fixos1.forEach(o => { if (!ausente(o.letra, d)) poeFixo(o.letra, 'FOLGA'); });
     }
 
     // Rotativos
@@ -2301,9 +2452,10 @@ function gerarMes(ops, ano, mes, estadosExt, travas) {
     // máximo S.metaN pessoas, garantido primeiro, antes de qualquer outra
     // decisão do dia (evita que uma "continuação de ontem" avaliada fora de
     // ordem acabe somando mais gente do que o teto permite).
+    escala['22-06'][d].forEach(l => nReais.add(l)); // madrugada travada à mão
     todosRot.forEach(o => {
       const l = o.letra;
-      if (ausente(l, d)) return;
+      if (ausente(l, d) || presosHoje.has(l)) return;
       const pos = blk[l][d];
       if (pos === null || pos >= 6) return;
       if (noHoje.has(l)) { escala['22-06'][d].push(l); nReais.add(l); prev[l] = '22-06'; seguidas[l]++; }
@@ -2315,12 +2467,13 @@ function gerarMes(ops, ano, mes, estadosExt, travas) {
     // e respeitando o teto mensal.
     todosRot.forEach(o => {
       const l = o.letra;
-      if (ausente(l, d) || nReais.has(l)) return;
+      if (ausente(l, d) || nReais.has(l) || presosHoje.has(l) || bloq('22-06')) return;
       const pos = blk[l][d];
       if (pos === null || pos >= 6) return;
       const pv = prev[l];
-      if (pv === '22-06' && seguidas[l] < 2 && nMes[l] < LIMITE_MADRUGADAS_MES && nReais.size < S.metaN && !semMadr.has(l)) {
-        escala['22-06'][d].push(l); nReais.add(l); prev[l] = '22-06';
+      if (pv === '22-06' && seguidas[l] < 2 && nMes[l] < LIMITE_MADRUGADAS_MES && nReais.size < S.metaN && !semMadr.has(l)
+          && cabeNoite(l, d) && compat(l, d, '22-06')) {
+        escala['22-06'][d].push(l); nReais.add(l); prev[l] = '22-06'; marcaNoite(l, d);
         nCount[l] = (nCount[l] || 0) + 1; nMes[l] = (nMes[l] || 0) + 1; seguidas[l]++;
       }
     });
@@ -2329,7 +2482,7 @@ function gerarMes(ops, ano, mes, estadosExt, travas) {
     // sobrado vaga na madrugada, ou vai pra fila de manhã/tarde do dia.
     todosRot.forEach(o => {
       const l = o.letra;
-      if (nReais.has(l)) return;
+      if (nReais.has(l) || presosHoje.has(l)) return;
       if (ausente(l, d)) { seguidas[l] = 0; return; }
       const pos = blk[l][d];
       if (pos === null || pos >= 6) { escala['FOLGA'][d].push(l); prev[l] = 'FOLGA'; seguidas[l] = 0; return; }
@@ -2347,11 +2500,15 @@ function gerarMes(ops, ano, mes, estadosExt, travas) {
       // 22-06 já foi tratado antes) — pra essas pessoas, 06-14 e 08-17 estão
       // bloqueados pelas 12h. Fica na tarde enquanto ela tiver vaga; com a
       // tarde já nos 8, vai pro 10-18 (22h → 10h = 12h de descanso).
-      if (currT >= S.metaT && podeTrabalhar(prev[l], '10-18')) {
+      const ok1018 = !bloq('10-18') && podeTrabalhar(prev[l], '10-18');
+      if ((currT >= S.metaT || bloq('14-22')) && ok1018) {
         escala['10-18'][d].push(l); prev[l] = '10-18';
         continue;
       }
-      escala['14-22'][d].push(l); currT++; pessoalT[l]++; prev[l] = '14-22';
+      if (!bloq('14-22') && compat(l, d, '14-22')) { escala['14-22'][d].push(l); currT++; pessoalT[l]++; prev[l] = '14-22'; continue; }
+      if (ok1018) { escala['10-18'][d].push(l); prev[l] = '10-18'; continue; }
+      // tarde e 10-18 travadas à mão e a manhã bloqueada pelas 12h: fica de folga
+      escala['FOLGA'][d].push(l); prev[l] = 'FOLGA';
     }
     const forcadoSet = new Set(tForcados.map(x => x[0]));
 
@@ -2364,22 +2521,37 @@ function gerarMes(ops, ano, mes, estadosExt, travas) {
       if (da !== db) return db - da;
       return a[1] - b[1];
     });
+    // sem vaga em manhã/tarde: 10-18; se ele também estiver travado, o turno
+    // livre que houver (mesmo acima da meta); em último caso, folga
+    const sobra = l => {
+      if (!bloq('10-18')) { escala['10-18'][d].push(l); prev[l] = '10-18'; return; }
+      if (!bloq('14-22') && compat(l, d, '14-22')) { escala['14-22'][d].push(l); currT++; pessoalT[l]++; prev[l] = '14-22'; return; }
+      if (!bloq('06-14')) { escala['06-14'][d].push(l); currM++; pessoalM[l]++; prev[l] = '06-14'; return; }
+      escala['FOLGA'][d].push(l); prev[l] = 'FOLGA';
+    };
     for (const [l] of mtLivres) {
-      const cabeM = currM < S.metaM, cabeT = currT < S.metaT;
+      const cabeM = !bloq('06-14') && currM < S.metaM, cabeT = !bloq('14-22') && currT < S.metaT && compat(l, d, '14-22');
       // desempate por mix PESSOAL dentro do bloco: quem tem menos manhãs que
       // tardes até agora pega manhã, e vice-versa — mantém o equilíbrio sem
       // travar num padrão fixo (aceita naturalmente 3M+3T, 2M+4T, etc.). Só
       // muda pro outro turno se o preferido já estourou o teto do dia — nunca
       // ignora a preferência pessoal só porque a tarde encheu primeiro.
-      const prefereM = pessoalM[l] <= pessoalT[l];
+      let prefereM = pessoalM[l] <= pessoalT[l];
+      // estabilidade: se na versão anterior ele já estava na manhã ou na tarde
+      // neste dia, mantém
+      if (versaoAnterior) {
+        const naM = ((versaoAnterior['06-14'] || {})[d] || []).indexOf(l) >= 0;
+        const naT = ((versaoAnterior['14-22'] || {})[d] || []).indexOf(l) >= 0;
+        if (naM !== naT) prefereM = naM;
+      }
       if (prefereM) {
         if (cabeM) { escala['06-14'][d].push(l); currM++; pessoalM[l]++; prev[l] = '06-14'; }
         else if (cabeT) { escala['14-22'][d].push(l); currT++; pessoalT[l]++; prev[l] = '14-22'; }
-        else { escala['10-18'][d].push(l); prev[l] = '10-18'; }
+        else sobra(l);
       } else {
         if (cabeT) { escala['14-22'][d].push(l); currT++; pessoalT[l]++; prev[l] = '14-22'; }
         else if (cabeM) { escala['06-14'][d].push(l); currM++; pessoalM[l]++; prev[l] = '06-14'; }
-        else { escala['10-18'][d].push(l); prev[l] = '10-18'; }
+        else sobra(l);
       }
     }
 
@@ -2389,9 +2561,11 @@ function gerarMes(ops, ano, mes, estadosExt, travas) {
     // extra só entra depois disso, quando não sobra mais ninguém pra realocar.
     const rotSet = new Set(todosRot.map(o => o.letra));
     function reforcarComOOutro(falta, doador, respeitaForcado) {
+      if (bloq(falta) || bloq(doador)) return;
       let seguro = 0;
       while (escala[falta][d].length < S.minDiurno && escala[doador][d].length > S.minDiurno && seguro++ < 20) {
-        const l = escala[doador][d].find(x => prev[x] === doador && rotSet.has(x) && !(respeitaForcado && forcadoSet.has(x)));
+        const l = escala[doador][d].find(x => prev[x] === doador && rotSet.has(x) && !(respeitaForcado && forcadoSet.has(x))
+                                            && compat(x, d, falta));
         if (!l) break;
         escala[doador][d].splice(escala[doador][d].indexOf(l), 1);
         escala[falta][d].push(l); prev[l] = falta;
@@ -2402,15 +2576,18 @@ function gerarMes(ops, ano, mes, estadosExt, travas) {
 
     // Cobertura mínima — puxa gente da folga (hora extra), só o que ainda faltar
     function overtimeTurno(t) {
+      if (bloq(t)) return;
       let faltam = S.minDiurno - escala[t][d].length;
       if (faltam <= 0) return;
       const cand = escala['FOLGA'][d]
-        .filter(l => rotSet.has(l) && podeTrabalhar(turnoOntem[l] || 'FOLGA', t))
+        .filter(l => rotSet.has(l) && !presosHoje.has(l) && podeTrabalhar(turnoOntem[l] || 'FOLGA', t) && compat(l, d, t))
         .sort((a, b) => {
+          // quem não emenda mais de 6 dias seguidos vem sempre antes;
           // pos 7 (dia do meio da folga) primeiro: trabalhar nele não emenda
           // com o bloco anterior nem com o próximo, evitando 7 dias seguidos
+          const ea = criaMaisDe6(a, d) ? 1 : 0, eb = criaMaisDe6(b, d) ? 1 : 0;
           const pa = Math.abs(((blk[a] || {})[d] ?? 7) - 7), pb = Math.abs(((blk[b] || {})[d] ?? 7) - 7);
-          return pa - pb || idxLetra[a] - idxLetra[b];
+          return ea - eb || pa - pb || idxLetra[a] - idxLetra[b];
         });
       for (const l of cand) {
         if (escala[t][d].length >= S.minDiurno) break;
@@ -2420,13 +2597,17 @@ function gerarMes(ops, ano, mes, estadosExt, travas) {
     }
     overtimeTurno('06-14'); overtimeTurno('14-22');
 
-    if (escala['22-06'][d].length < S.metaN) {
+    if (escala['22-06'][d].length < S.metaN && !bloq('22-06')) {
       const baseCand = escala['FOLGA'][d]
         // quem trabalhou madrugada ontem não entra de novo aqui — já teve a
         // chance de emendar a segunda noite lá em cima (nReais); puxá-lo de
         // novo pela cobertura mínima empilharia 3+ madrugadas seguidas.
-        .filter(l => rotSet.has(l) && !semMadr.has(l) && turnoOntem[l] !== '22-06' && podeTrabalhar(turnoOntem[l] || 'FOLGA', '22-06'));
-      const ordenaCand = (a, b) => (nMes[a] || 0) - (nMes[b] || 0) || (nCount[a] || 0) - (nCount[b] || 0)
+        // E ninguém passa de MAX_MADRUGADAS_CICLO no ciclo — antes a hora
+        // extra puxava da folga quem já tinha feito as 2 do bloco (N N F F N).
+        .filter(l => rotSet.has(l) && !presosHoje.has(l) && !semMadr.has(l) && turnoOntem[l] !== '22-06'
+                     && podeTrabalhar(turnoOntem[l] || 'FOLGA', '22-06') && cabeNoite(l, d) && compat(l, d, '22-06'));
+      const ordenaCand = (a, b) => (criaMaisDe6(a, d) ? 1 : 0) - (criaMaisDe6(b, d) ? 1 : 0)
+          || (nMes[a] || 0) - (nMes[b] || 0) || (nCount[a] || 0) - (nCount[b] || 0)
           || Math.abs(((blk[a] || {})[d] ?? 7) - 7) - Math.abs(((blk[b] || {})[d] ?? 7) - 7);
       // primeiro só quem ainda está dentro do teto mensal; só ultrapassa o
       // limite se não sobrar mais ninguém e a cobertura mínima exigir.
@@ -2435,17 +2616,18 @@ function gerarMes(ops, ano, mes, estadosExt, travas) {
       for (const l of cand) {
         if (escala['22-06'][d].length >= S.metaN) break;
         escala['FOLGA'][d].splice(escala['FOLGA'][d].indexOf(l), 1);
-        escala['22-06'][d].push(l); overtime['22-06'][d].push(l);
+        escala['22-06'][d].push(l); overtime['22-06'][d].push(l); marcaNoite(l, d);
         nCount[l] = (nCount[l] || 0) + 1; nMes[l] = (nMes[l] || 0) + 1; prev[l] = '22-06'; seguidas[l] = 1;
       }
     }
 
     // Reequilíbrio manhã/tarde (diferença máxima de 1)
     function rebalancear(maior, menor, checa12h) {
+      if (bloq(maior) || bloq(menor)) return;
       let guarda = 0;
       while (escala[maior][d].length - escala[menor][d].length > 1 && guarda++ < 40) {
         const l = escala[maior][d].find(x =>
-          prev[x] === maior && rotSet.has(x) && !(checa12h && forcadoSet.has(x)));
+          prev[x] === maior && rotSet.has(x) && !(checa12h && forcadoSet.has(x)) && compat(x, d, menor));
         if (!l) break;
         escala[maior][d].splice(escala[maior][d].indexOf(l), 1);
         escala[menor][d].push(l); prev[l] = menor;
@@ -2457,15 +2639,17 @@ function gerarMes(ops, ano, mes, estadosExt, travas) {
     // Realocação por polo: troca gente entre 06-14/14-22/10-18 (só nesses
     // três) pra cada um chegar mais perto de cobrir o próprio polo
     // principal, sempre respeitando as 12h de descanso do dia anterior.
-    realocarPorPolo(escala, overtime, d, prev, turnoOntem, infoPolo, rotSetPolo, pessoalM, pessoalT);
+    realocarPorPolo(escala, overtime, d, prev, turnoOntem, infoPolo, rotSetPolo, pessoalM, pessoalT,
+                    TURNOS_REALOC_PADRAO.filter(t => !bloq(t)), presosHoje, (x, t) => compat(x, d, t));
 
     // Teto de manhã/tarde: passou de S.metaM / S.metaT (8), quem sobra vai pro
     // 10-18. Sai primeiro quem NÃO está cobrindo o próprio polo naquele turno;
     // hora extra e fixos não saem. Sempre respeitando as 12h de ontem.
     function limitarTurno(t, meta) {
+      if (bloq(t) || bloq('10-18')) return;
       let guarda = 0;
       while (escala[t][d].length > meta && guarda++ < 40) {
-        const cands = escala[t][d].filter(x => rotSet.has(x) && overtime[t][d].indexOf(x) < 0
+        const cands = escala[t][d].filter(x => rotSet.has(x) && !presosHoje.has(x) && overtime[t][d].indexOf(x) < 0
           && podeTrabalhar(turnoOntem[x] || 'FOLGA', '10-18'));
         if (!cands.length) break;
         const { proprio } = cascatearPolos(escala[t][d].filter(x => rotSetPolo.has(x)), infoPolo,
@@ -2507,8 +2691,10 @@ function aplicarAusencias(res, ops, aPartirDe) {
   const { ano, mes, dias, escala } = res;
   ops.forEach(op => {
     (op.ausencias || []).forEach(a => {
-      const destinoBase = MOTIVO_TURNO[a.motivo];
-      if (!destinoBase || !a.inicio || !a.fim) return;
+      // motivo fora da lista: antes a pessoa saía dos turnos (datasAusencia) mas
+      // não entrava em linha nenhuma — sumia. Agora cai na folga.
+      const destinoBase = MOTIVO_TURNO[a.motivo] || 'FOLGA';
+      if (!destinoBase || !dataIsoValida(a.inicio) || !dataIsoValida(a.fim)) return;
       for (let d = 1; d <= dias; d++) {
         const hoje = iso(ano, mes, d);
         if (hoje < a.inicio || hoje > a.fim) continue;
@@ -2516,8 +2702,6 @@ function aplicarAusencias(res, ops, aPartirDe) {
         TURNOS_TRABALHO.forEach(t => {
           const i = escala[t][d].indexOf(op.letra);
           if (i >= 0) escala[t][d].splice(i, 1);
-          const ot = (res.overtime && res.overtime[t]) ? res.overtime[t][d] : null;
-          if (Array.isArray(ot) && ot.indexOf(op.letra) >= 0) res.overtime[t][d] = ot.filter(l => l !== op.letra);
         });
         const destino = (destinoBase === 'TREINAMENTO' && ehFdsFeriado(ano, mes, d)) ? 'FOLGA' : destinoBase;
         ['FOLGA'].concat(TURNOS_AUSENCIA).forEach(t => {
@@ -2566,15 +2750,38 @@ function aplicarManuais(res) {
       if (Array.isArray(ot)) res.overtime[t][d] = ot.filter(l => !tirar(l));
     });
   });
-  /* Ausência cadastrada vence célula travada. Uma edição manual feita ANTES
-     de lançar férias/treinamento/atestado guardava a letra no turno e ela
-     continuava trabalhando no período da ausência (ex.: operador em
-     treinamento aparecendo no MPS). Reaplicar as ausências depois das
-     travas tira a letra dos turnos só nos dias da ausência; a trava em si
-     continua salva, então se a ausência for apagada a célula volta como era.
-     Só de hoje em diante: o que já passou é registro do que aconteceu e não
-     é reescrito. */
+  reencaixarDeslocados(res, travadas);
+  // Ausência do cadastro vale mais que a edição manual: quem entrou de férias,
+  // atestado etc. sai da célula editada e vai pra linha da ausência. (Antes a
+  // célula travada colocava a pessoa de volta no turno e ela sumia da linha
+  // de férias.) A edição continua guardada: se a ausência for apagada, ela volta.
+  // Só de hoje em diante — o que já passou fica exatamente como foi travado.
   aplicarAusencias(res, S.ops, paraIso(new Date()));
+}
+/* Rede de segurança: toda letra que estava na grade do gerador (`base`) num
+   dia com célula editada à mão e que, depois da edição, não aparece em linha
+   nenhuma daquele dia, volta pra grade — nunca some. Se a linha de origem não
+   tem limite de gente (folga, MPS, 08-17, ausências) ela volta pra lá; se era
+   um turno (manhã, tarde, 10-18, madrugada) cuja célula foi editada sem ela,
+   fica de folga naquele dia. */
+function reencaixarDeslocados(res, travadas) {
+  if (!res || !res.base) return;
+  const conhecidas = new Set(S.ops.map(o => o.letra));
+  const TURNOS_COM_VAGA = ['06-14', '14-22', '10-18', '22-06'];
+  Object.keys(travadas).forEach(ds => {
+    const d = Number(ds);
+    const noDia = new Set();
+    ORDEM_LINHAS.forEach(t => ((res.escala[t] || {})[d] || []).forEach(l => noDia.add(l)));
+    ORDEM_LINHAS.forEach(t => {
+      ((res.base[t] || {})[d] || []).forEach(l => {
+        if (noDia.has(l) || !conhecidas.has(l)) return;
+        const destino = TURNOS_COM_VAGA.indexOf(t) >= 0 ? 'FOLGA' : t;
+        if (!Array.isArray(res.escala[destino][d])) res.escala[destino][d] = [];
+        res.escala[destino][d].push(l);
+        noDia.add(l);
+      });
+    });
+  });
 }
 
 /* ── Reaplicar o cadastro em meses que já existem (inclusive os de fora) ──
@@ -2898,12 +3105,18 @@ function ressincronizarTodosOsMeses() {
 }
 
 /* ═══════════════ geração de vários meses ═══════════════ */
+function dataIsoValida(s) {
+  return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && Number(s.slice(0, 4)) >= 2000;
+}
 function limparAusenciasVencidas() {
   const hoje = paraIso(new Date());
   let removidas = 0;
   S.ops.forEach(o => {
     const antes = (o.ausencias || []).length;
-    o.ausencias = (o.ausencias || []).filter(a => !a.fim || a.fim >= hoje);
+    // data com ano incompleto (ex.: "0002-10-15" enquanto o ano está sendo
+    // digitado) não conta como vencida — antes a ausência era apagada no meio
+    // da digitação, porque cada tecla no campo de data já gerava a escala
+    o.ausencias = (o.ausencias || []).filter(a => !dataIsoValida(a.fim) || a.fim >= hoje);
     removidas += antes - o.ausencias.length;
   });
   return removidas;
@@ -3034,6 +3247,22 @@ function travasDoMes(ano, mes, anterior) {
   }
   return Object.keys(out).length ? out : null;
 }
+/* Células editadas à mão nos dias que não estão travados por inteiro (ou seja,
+   de hoje em diante): o gerador passa a montar o dia em volta delas. */
+function presasDoMes(ano, mes, travas) {
+  const dias = diasNoMes(ano, mes);
+  const chave = { ano, mes };
+  const out = {};
+  for (let d = 1; d <= dias; d++) {
+    if (travas && travas[d]) continue;
+    ORDEM_LINHAS.forEach(t => {
+      const k = chaveManual(chave, t, d);
+      if (!(k in S.manual)) return;
+      (out[d] = out[d] || {})[t] = (S.manual[k] || []).slice();
+    });
+  }
+  return Object.keys(out).length ? out : null;
+}
 function gerarTudo(travarPassado) {
   if (!S.ops.length) { aviso('Cadastre operadores antes de gerar.'); return; }
   if (travarPassado !== false) travarDiasPassados();
@@ -3079,6 +3308,8 @@ function gerarTudo(travarPassado) {
   const meses = [];
   if (S.mesReferencia) { S.mesReferencia.externo = true; meses.push(S.mesReferencia); } // mês carregado de fora entra fixo como a 1ª aba
   let a = a0, m = m0;
+  // mês logo antes do primeiro gerado — pra contar as madrugadas do fim dele
+  let resAnterior = (() => { const [pa, pm] = mesAnterior(a0, m0); return S.historico[chaveMes(pa, pm)] || null; })();
   for (let i = 0; i < S.nMeses; i++) {
     const chaveAtual = chaveMes(a, m);
     const existente = S.historico[chaveAtual];
@@ -3094,6 +3325,7 @@ function gerarTudo(travarPassado) {
         if (estados[l]) estados[l].ciclo = (existente.cicloEncaixe[l] + existente.dias) % 9;
       });
       meses.push(existente);
+      resAnterior = existente;
     } else {
       // quem entrou no rodízio neste mês por troca de polo começa na posição
       // calculada pelos dias que já tinha trabalhado (não estoura 6 seguidos)
@@ -3107,12 +3339,15 @@ function gerarTudo(travarPassado) {
         estados[o.letra] = e;
       });
       const travas = travarPassado !== false ? travasDoMes(a, m, existente) : null;
-      const res = gerarMes(S.ops, a, m, estados, travas);
+      const presas = presasDoMes(a, m, travas);
+      const res = gerarMes(S.ops, a, m, estados, travas, presas, resAnterior,
+                           existente && !ehMesExterno(existente) ? existente.base : null);
       estados = res.estados;
       garantirBase(res);              // grade "limpa", antes de ausência/manual
       aplicarAusencias(res, S.ops);
       aplicarManuais(res);
       meses.push(res);
+      resAnterior = res;
     }
     [a, m] = proximoMes(a, m);
   }
@@ -3625,7 +3860,8 @@ function desenharCadastro() {
 
     const cx2 = el('input', { type: 'checkbox', class: 'cx' }); cx2.checked = !!o.duas_madrugadas;
     cx2.disabled = !S.editando;
-    cx2.title = 'Topa pegar as duas madrugadas seguidas do bloco (posições 4 e 5), sujeito ao teto de ' + LIMITE_MADRUGADAS_MES + '/mês';
+    cx2.title = 'Topa pegar as duas madrugadas seguidas do bloco (posições 4 e 5), sujeito ao teto de ' + LIMITE_MADRUGADAS_MES
+      + '/mês e ao máximo de ' + MAX_MADRUGADAS_CICLO + ' por ciclo';
     cx2.onchange = () => { o.duas_madrugadas = cx2.checked; };
     add(cx2);
 
@@ -3686,7 +3922,13 @@ function desenharAusencias() {
     const data = (prop) => {
       const td = el('td'); const inp = el('input', { type: 'date', value: a[prop] || '' });
       inp.disabled = !S.editando;
-      inp.onchange = () => { a[prop] = inp.value; desenharAusencias(); gerarTudo(); };
+      inp.onchange = () => {
+        a[prop] = inp.value;
+        // só recalcula com as duas datas completas e em ordem
+        if (!dataIsoValida(a.inicio) || !dataIsoValida(a.fim)) return;
+        if (a.fim < a.inicio) { aviso('A data final não pode ser anterior à inicial.'); return; }
+        registrarPasso(); desenharAusencias(); gerarTudo(); carimbarAtualizacao();
+      };
       td.appendChild(inp); return td;
     };
     tr.appendChild(data('inicio')); tr.appendChild(data('fim'));
@@ -3778,6 +4020,8 @@ function desenharPainel() {
     if (res.escala['14-22'][d].length < S.minDiurno)
       falhas.push(`dia ${d}: ${res.escala['14-22'][d].length} na tarde (mínimo ${S.minDiurno})`);
   }
+  madrugadasAcimaDoCiclo(res).forEach(x =>
+    falhas.push(`dia ${x.d}: ${x.letra} com ${x.n} madrugadas em ${JANELA_CICLO} dias (máx ${MAX_MADRUGADAS_CICLO})`));
   const c0 = el('div', { class: 'cartao' });
   c0.appendChild(el('header', {}, [el('h2', { text: 'Conferência de cobertura' })]));
   const corpo0 = el('div', { class: 'corpo' });
@@ -3904,6 +4148,32 @@ function topPolosOperador(contagem, diasTrabalhados) {
     .map(sigla => ({ sigla, pct: diasTrabalhados ? (contagem[sigla] / diasTrabalhados * 100) : 0 }))
     .filter(e => e.pct > 0)
     .sort((a, b) => b.pct - a.pct);
+}
+/* Quem passou de MAX_MADRUGADAS_CICLO madrugadas em JANELA_CICLO dias (conta
+   também o fim do mês anterior). O gerador nunca faz isso sozinho — só
+   aparece se veio de edição manual ou de arquivo importado. */
+function madrugadasAcimaDoCiclo(res) {
+  const out = [];
+  if (!res || !res.escala || !res.escala['22-06']) return out;
+  const [pa, pm] = mesAnterior(res.ano, res.mes);
+  const ant = S.historico[chaveMes(pa, pm)];
+  const noites = {};
+  const marca = (l, i) => (noites[l] = noites[l] || new Set()).add(i);
+  if (ant && ant.escala && ant.escala['22-06']) {
+    for (let k = 0; k < JANELA_CICLO - 1 && ant.dias - k >= 1; k++)
+      (ant.escala['22-06'][ant.dias - k] || []).forEach(l => marca(l, -k));
+  }
+  for (let d = 1; d <= res.dias; d++) (res.escala['22-06'][d] || []).forEach(l => marca(l, d));
+  Object.keys(noites).forEach(l => {
+    const s = noites[l];
+    for (let d = 1; d <= res.dias; d++) {
+      if (!s.has(d)) continue;
+      let n = 0;
+      for (let x = d - JANELA_CICLO + 1; x <= d; x++) if (s.has(x)) n++;
+      if (n > MAX_MADRUGADAS_CICLO) out.push({ d, letra: l, n });
+    }
+  });
+  return out.sort((a, b) => a.d - b.d);
 }
 function statsDoMes(resX) {
   const trab = {}, madr = {}, extra = {}, turnoCont = {};
@@ -4364,7 +4634,12 @@ function iniciarEdicaoInline(celEl) {
 
     desenharEscala(); desenharOperador(); desenharPainel();
     carimbarAtualizacao();
+    // quem foi tirado da célula e não está em mais nenhuma linha do dia
+    const semLugar = letrasAtuais.filter(l => novas.indexOf(l) < 0
+      && !ORDEM_LINHAS.some(t => (res.escala[t][dia] || []).indexOf(l) >= 0));
     if (desconhecidas.length) aviso('Letra não cadastrada: ' + desconhecidas.join(', '));
+    else if (semLugar.length) aviso(`Célula atualizada. ${semLugar.join(', ')} ficou sem turno neste dia — ` +
+      'coloque em outra linha, ou a escala reencaixa automaticamente ao recalcular.', 6000);
     else aviso('Célula atualizada. A edição fica guardada mesmo se você gerar de novo.');
   }
   function cancelarInline() {
@@ -5760,7 +6035,7 @@ $('#modalAus').onclick = e => { if (e.target.id === 'modalAus') fecharAus(); };
 $('#ausSalvar').onclick = () => {
   const op = S.ops.find(o => o.letra === $('#ausOp').value);
   const ini = $('#ausIni').value, fim = $('#ausFim').value;
-  if (!op || !ini || !fim) { aviso('Escolha o operador e as duas datas.'); return; }
+  if (!op || !dataIsoValida(ini) || !dataIsoValida(fim)) { aviso('Escolha o operador e as duas datas.'); return; }
   if (fim < ini) { aviso('A data final não pode ser anterior à inicial.'); return; }
   registrarPasso();
   op.ausencias.push({ inicio: ini, fim, motivo: $('#ausMotivo').value });
@@ -6258,4 +6533,4 @@ async function carregarDadosPublicados() {
 })();
 </script>
 </body>
-</html>
+</html>
