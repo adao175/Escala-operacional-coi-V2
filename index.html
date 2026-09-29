@@ -2580,14 +2580,16 @@ function gerarMes(ops, ano, mes, estadosExt, travas, presas, anteriorRes, versao
       let faltam = S.minDiurno - escala[t][d].length;
       if (faltam <= 0) return;
       const cand = escala['FOLGA'][d]
-        .filter(l => rotSet.has(l) && !presosHoje.has(l) && podeTrabalhar(turnoOntem[l] || 'FOLGA', t) && compat(l, d, t))
+        // hora extra nunca emenda mais de 6 dias seguidos — melhor o turno
+        // ficar com um a menos
+        .filter(l => rotSet.has(l) && !presosHoje.has(l) && podeTrabalhar(turnoOntem[l] || 'FOLGA', t) && compat(l, d, t)
+                     && !criaMaisDe6(l, d))
         .sort((a, b) => {
           // quem não emenda mais de 6 dias seguidos vem sempre antes;
           // pos 7 (dia do meio da folga) primeiro: trabalhar nele não emenda
           // com o bloco anterior nem com o próximo, evitando 7 dias seguidos
-          const ea = criaMaisDe6(a, d) ? 1 : 0, eb = criaMaisDe6(b, d) ? 1 : 0;
           const pa = Math.abs(((blk[a] || {})[d] ?? 7) - 7), pb = Math.abs(((blk[b] || {})[d] ?? 7) - 7);
-          return ea - eb || pa - pb || idxLetra[a] - idxLetra[b];
+          return pa - pb || idxLetra[a] - idxLetra[b];
         });
       for (const l of cand) {
         if (escala[t][d].length >= S.minDiurno) break;
@@ -2605,9 +2607,9 @@ function gerarMes(ops, ano, mes, estadosExt, travas, presas, anteriorRes, versao
         // E ninguém passa de MAX_MADRUGADAS_CICLO no ciclo — antes a hora
         // extra puxava da folga quem já tinha feito as 2 do bloco (N N F F N).
         .filter(l => rotSet.has(l) && !presosHoje.has(l) && !semMadr.has(l) && turnoOntem[l] !== '22-06'
-                     && podeTrabalhar(turnoOntem[l] || 'FOLGA', '22-06') && cabeNoite(l, d) && compat(l, d, '22-06'));
-      const ordenaCand = (a, b) => (criaMaisDe6(a, d) ? 1 : 0) - (criaMaisDe6(b, d) ? 1 : 0)
-          || (nMes[a] || 0) - (nMes[b] || 0) || (nCount[a] || 0) - (nCount[b] || 0)
+                     && podeTrabalhar(turnoOntem[l] || 'FOLGA', '22-06') && cabeNoite(l, d) && compat(l, d, '22-06')
+                     && !criaMaisDe6(l, d)); // melhor a madrugada com 2 do que alguém com 7 dias seguidos
+      const ordenaCand = (a, b) => (nMes[a] || 0) - (nMes[b] || 0) || (nCount[a] || 0) - (nCount[b] || 0)
           || Math.abs(((blk[a] || {})[d] ?? 7) - 7) - Math.abs(((blk[b] || {})[d] ?? 7) - 7);
       // primeiro só quem ainda está dentro do teto mensal; só ultrapassa o
       // limite se não sobrar mais ninguém e a cobertura mínima exigir.
@@ -3036,9 +3038,225 @@ function ressincronizarMes(res) {
   if (ehMesExterno(res)) recomporBaseExterna(res, S.ops);
   res.escala = clonar(res.base);
   normalizarEscala(res);
+  tirarRemovidosDoFuturo(res);
+  aplicarAjustesOp(res);
   aplicarFixosDeCadastro(res, S.ops);
   aplicarAusencias(res, S.ops);
   aplicarManuais(res);
+}
+/* Ajustes feitos só para UM operador (troca de polo/função, operador novo):
+   res.ajusteOp[letra][dia] = turno. Ele sai de onde estava na grade e vai pro
+   turno planejado — ninguém mais é tocado. */
+function aplicarAjustesOp(res) {
+  if (!res.ajusteOp) return;
+  Object.keys(res.ajusteOp).forEach(l => {
+    const plano = res.ajusteOp[l] || {};
+    Object.keys(plano).forEach(ds => {
+      const d = Number(ds), t = plano[ds];
+      if (!t || d < 1 || d > res.dias || !res.escala[t]) return;
+      ORDEM_LINHAS.forEach(tt => {
+        const arr = res.escala[tt][d];
+        if (Array.isArray(arr) && arr.indexOf(l) >= 0) res.escala[tt][d] = arr.filter(x => x !== l);
+        const ot = res.overtime && res.overtime[tt] && res.overtime[tt][d];
+        if (Array.isArray(ot) && ot.indexOf(l) >= 0) res.overtime[tt][d] = ot.filter(x => x !== l);
+      });
+      res.escala[t][d].push(l);
+    });
+  });
+}
+/* Operador apagado do cadastro some da grade de hoje em diante (o passado fica). */
+function tirarRemovidosDoFuturo(res) {
+  const existem = new Set(S.ops.map(o => o.letra));
+  const hoje = paraIso(new Date());
+  for (let d = 1; d <= res.dias; d++) {
+    if (iso(res.ano, res.mes, d) < hoje) continue;
+    ORDEM_LINHAS.forEach(t => {
+      const arr = res.escala[t][d];
+      if (Array.isArray(arr) && arr.some(l => !existem.has(l))) res.escala[t][d] = arr.filter(l => existem.has(l));
+    });
+  }
+}
+/* Categoria do operador na escala — só troca de categoria mexe na grade. */
+function categoriaOp(o) {
+  const c = classificar([o]);
+  if (c.mps.length) return 'MPS';
+  if (c.fixos3.length) return 'AJU3';
+  if (c.fixos1.length) return 'AJU1';
+  if (c.todosRot.length) return 'ROT';
+  return '';
+}
+/* ═══════════ encaixe de UM operador, sem mexer em mais ninguém ═══════════
+   Usado quando o operador troca de categoria (MPS → polo, polo → MPS,
+   Aracaju-3, fixo do Aracaju-1...) ou quando é novo. A escala pronta dos
+   outros não muda: só as células dele, de hoje em diante.
+   Rodízio: continua o 6x3 a partir dos dias que ele já vinha trabalhando; se
+   não houver histórico, começa na posição do ciclo onde tem menos gente. Em
+   cada dia de trabalho ele vai pro turno que está mais vazio em relação à
+   meta — madrugada (fim do bloco, respeitando no máximo 2 por ciclo), manhã
+   ou tarde — sempre com as 12h de descanso. Se manhã e tarde já estiverem na
+   meta, vai pro 10-18. */
+function reencaixarOperador(o) {
+  const l = o.letra;
+  if (!letraValida(l) || opsDaEscala(S.ops).indexOf(o) < 0) return;
+  const hoje = paraIso(new Date());
+  const meses = historicoOrdenado().filter(r => r && r.escala && iso(r.ano, r.mes, r.dias) >= hoje);
+  if (!meses.length) return;
+  const cat = categoriaOp(o);
+
+  // edições manuais dele de hoje em diante deixam de valer (senão o prendiam
+  // no lugar antigo); as células continuam travadas para os outros
+  Object.keys(S.manual).forEach(k => {
+    const [am, , dia] = k.split('|'); const [a, m] = am.split('-').map(Number);
+    if (iso(a, m, Number(dia)) < hoje) return;
+    if ((S.manual[k] || []).indexOf(l) >= 0) S.manual[k] = S.manual[k].filter(x => x !== l);
+  });
+
+  // linha do tempo de hoje em diante
+  const dias = [];
+  meses.forEach(r => { for (let d = 1; d <= r.dias; d++) if (iso(r.ano, r.mes, d) >= hoje) dias.push({ r, d }); });
+  const aus = datasAusencia(o);
+  const conta = (r, d, t) => ((r.escala[t] || {})[d] || []).filter(x => x !== l).length;
+  const meta = { '06-14': Number(S.metaM) || 8, '14-22': Number(S.metaT) || 8, '22-06': Number(S.metaN) || 3 };
+
+  // turno de ontem (dia que já passou, travado)
+  const ontemDt = new Date(); ontemDt.setDate(ontemDt.getDate() - 1);
+  const resOntem = S.historico[chaveMes(ontemDt.getFullYear(), ontemDt.getMonth() + 1)];
+  let prevT = (resOntem && resOntem.escala && turnoDe(resOntem, l, ontemDt.getDate())) || 'FOLGA';
+
+  // madrugadas dele nos últimos 8 dias (regra de no máximo 2 por ciclo)
+  const noites = [];
+  for (let k = 1; k < JANELA_CICLO; k++) {
+    const x = new Date(); x.setDate(x.getDate() - k);
+    const r = S.historico[chaveMes(x.getFullYear(), x.getMonth() + 1)];
+    if (r && r.escala && ((r.escala['22-06'] || {})[x.getDate()] || []).indexOf(l) >= 0) noites.push(-k);
+  }
+  const cabeNoite = (i, extra) => {
+    const todas = noites.concat([i]).concat(extra || []);
+    return [i].concat(extra || []).every(x => {
+      for (let ini = x - JANELA_CICLO + 1; ini <= x; ini++)
+        if (todas.filter(y => y >= ini && y < ini + JANELA_CICLO).length > MAX_MADRUGADAS_CICLO) return false;
+      return true;
+    });
+  };
+
+  // posição inicial no 6x3 (só pra quem é do rodízio)
+  let p0 = 0;
+  if (cat === 'ROT') {
+    const s = posicaoPeloHistorico(l, hoje);
+    if (s !== null && s > 0) p0 = Math.min(s, 6);
+    else {
+      const cands = s === 0 ? [0, 7, 8] : [0, 1, 2, 3, 4, 5, 6, 7, 8];
+      let melhor = null;
+      cands.forEach(p => {
+        let gente = 0, n = 0;
+        for (let i = 0; i < Math.min(9, dias.length); i++) {
+          if ((p + i) % 9 >= 6) continue;
+          const { r, d } = dias[i];
+          gente += ['06-14', '14-22', '22-06', '10-18'].reduce((acc, t) => acc + conta(r, d, t), 0); n++;
+        }
+        const media = n ? gente / n : 0;
+        if (!melhor || media < melhor.media) melhor = { p, media };
+      });
+      p0 = melhor.p;
+    }
+  }
+
+  let noiteAmanha = false;             // 1ª noite de uma dupla: a 2ª vem amanhã
+  let comecou = false;                 // já fez o 1º dia de trabalho depois da troca?
+  let blocoM = 0, blocoT = 0;          // equilíbrio manhã/tarde dentro do bloco
+  dias.forEach(({ r, d }, i) => {
+    const dIso = iso(r.ano, r.mes, d);
+    let t = 'FOLGA';
+    if (aus.has(dIso)) {
+      t = 'FOLGA'; noiteAmanha = false;       // a ausência leva ele pra linha certa depois
+      // voltando de férias/ausência a sequência do 6x3 segue normal — a regra
+      // de começar na manhã/tarde vale só pro 1º dia logo após a troca
+      comecou = true;
+    } else if (cat === 'MPS') {
+      t = ehDiaUtil(r.ano, r.mes, d) ? 'MPS' : 'FOLGA';
+    } else if (cat === 'AJU3') {
+      t = !ehFds(r.ano, r.mes, d) ? '08-17' : 'FOLGA';
+    } else if (cat === 'AJU1' || cat === 'ROT') {
+      const pos = cat === 'ROT' ? (p0 + i) % 9 : null;
+      const trabalha = cat === 'ROT' ? pos < 6 : ehDiaUtil(r.ano, r.mes, d);
+      if (pos === 0) { blocoM = 0; blocoT = 0; }
+      if (!trabalha) {
+        t = 'FOLGA'; noiteAmanha = false;
+      } else if (!comecou) {
+        // REGRA: quem é novo ou trocou de polo começa SEMPRE na manhã ou na
+        // tarde (nunca na madrugada nem no 10-18), respeitando as 12h desde o
+        // último turno. Se as 12h não deixarem nenhum dos dois hoje (ex.: fez
+        // madrugada ontem), fica de folga e começa no próximo dia de trabalho.
+        const opcoes = ['06-14', '14-22'].filter(tt => podeTrabalhar(prevT, tt));
+        if (opcoes.length) {
+          const vaga = tt => meta[tt] - conta(r, d, tt);
+          opcoes.sort((a, b) => vaga(b) - vaga(a));
+          t = opcoes[0]; comecou = true;
+          if (t === '06-14') blocoM++; else blocoT++;
+        } else {
+          t = 'FOLGA';
+        }
+        noiteAmanha = false;
+      } else if (noiteAmanha || prevT === '22-06') {
+        // 2ª noite da dupla; se não couber, folga (depois da madrugada não dá turno de dia)
+        t = (conta(r, d, '22-06') < meta['22-06'] && cabeNoite(i)) ? '22-06' : 'FOLGA';
+        noiteAmanha = false;
+      } else {
+        // REGRA: madrugada só no último dia do bloco (posição 5); a dupla
+        // 4+5 só pra quem marcou "pega 2 madrugadas" — as duas terminam o bloco
+        const podeNoite = cat === 'ROT' && !o.sem_madrugada && (pos === 5 || (pos === 4 && o.duas_madrugadas))
+          && conta(r, d, '22-06') < meta['22-06'] && podeTrabalhar(prevT, '22-06');
+        let dupla = false;
+        if (podeNoite && pos === 4) {
+          const prox = dias[i + 1];
+          dupla = !!prox && conta(prox.r, prox.d, '22-06') < meta['22-06'] && cabeNoite(i, [i + 1])
+                  && !aus.has(iso(prox.r.ano, prox.r.mes, prox.d));
+        }
+        if (podeNoite && ((pos === 5 && cabeNoite(i)) || dupla)) {
+          t = '22-06'; noiteAmanha = dupla;
+        } else {
+          const opcoes = ['06-14', '14-22'].filter(tt => podeTrabalhar(prevT, tt));
+          const folga = tt => meta[tt] - conta(r, d, tt);
+          const livres = opcoes.filter(tt => folga(tt) > 0);
+          if (livres.length) {
+            livres.sort((a, b) => (folga(b) - folga(a))
+              || ((a === '06-14' ? blocoM - blocoT : blocoT - blocoM) - (b === '06-14' ? blocoM - blocoT : blocoT - blocoM)));
+            t = livres[0];
+          } else {
+            t = podeTrabalhar(prevT, '10-18') ? '10-18' : 'FOLGA';
+          }
+          if (t === '06-14') blocoM++; else if (t === '14-22') blocoT++;
+        }
+      }
+    }
+    if (t === '22-06') noites.push(i);
+    (r.ajusteOp = r.ajusteOp || {});
+    (r.ajusteOp[l] = r.ajusteOp[l] || {})[d] = t;
+    // célula travada à mão: ele entra na trava (senão a edição o apagava do dia)
+    const k = chaveManual(r, t, d);
+    if (k in S.manual && S.manual[k].indexOf(l) < 0) S.manual[k].push(l);
+    prevT = aus.has(dIso) ? 'FOLGA' : t;
+  });
+  ressincronizarTodosOsMeses();
+}
+/* Operador que ainda não aparece em nenhum dia daqui pra frente (acabou de
+   ganhar letra, por exemplo) é encaixado sozinho — o resto da escala não muda. */
+function encaixarOperadoresNovos() {
+  const hoje = paraIso(new Date());
+  const meses = historicoOrdenado().filter(r => r && r.escala && !ehMesExterno(r) && iso(r.ano, r.mes, r.dias) >= hoje);
+  if (!meses.length) return false;
+  let algum = false;
+  opsDaEscala(S.ops).forEach(o => {
+    const aparece = meses.some(r => {
+      for (let d = 1; d <= r.dias; d++) {
+        if (iso(r.ano, r.mes, d) < hoje) continue;
+        if (ORDEM_LINHAS.some(t => ((r.escala[t] || {})[d] || []).indexOf(o.letra) >= 0)) return true;
+      }
+      return false;
+    });
+    if (!aparece) { reencaixarOperador(o); algum = true; }
+  });
+  return algum;
 }
 /* Depois de qualquer clonagem em bloco (carregar projeto, desfazer/refazer)
    os objetos de S.meses e S.mesReferencia viram cópias soltas do histórico.
@@ -3078,6 +3296,9 @@ function renomearLetra(antes, depois) {
     varrerGrade(res.overtime);
     if (res.cicloEncaixe && antes in res.cicloEncaixe && !(depois in res.cicloEncaixe)) {
       res.cicloEncaixe[depois] = res.cicloEncaixe[antes]; delete res.cicloEncaixe[antes];
+    }
+    if (res.ajusteOp && res.ajusteOp[antes] && !res.ajusteOp[depois]) {
+      res.ajusteOp[depois] = res.ajusteOp[antes]; delete res.ajusteOp[antes];
     }
     if (res.estados && res.estados[antes] && !res.estados[depois]) {
       res.estados[depois] = res.estados[antes]; delete res.estados[antes];
@@ -3247,6 +3468,24 @@ function travasDoMes(ano, mes, anterior) {
   }
   return Object.keys(out).length ? out : null;
 }
+/* Ponto de partida do mês seguinte a um mês pronto: o estado que a geração
+   guardou e, pra quem foi ajustado depois (ou não estava nele), o que dá pra
+   ler da própria grade. O último turno sempre vem da grade final (12h). */
+function estadosAoFimDe(res, estadosAntes) {
+  const out = clonar(res.estados || estadosAntes || {});
+  const ajustados = new Set(Object.keys(res.ajusteOp || {}));
+  const { todosRot } = classificar(opsDaEscala(S.ops));
+  const precisa = todosRot.filter(o => ajustados.has(o.letra) || !out[o.letra]);
+  if (precisa.length) {
+    const inf = inferirEstadosDeEscala(res, precisa);
+    precisa.forEach(o => { if (inf[o.letra]) out[o.letra] = inf[o.letra]; });
+  }
+  todosRot.forEach(o => {
+    if (!out[o.letra]) return;
+    out[o.letra].ultimo_turno = turnoDe(res, o.letra, res.dias) || 'FOLGA';
+  });
+  return garantirEstados(out, opsDaEscala(S.ops));
+}
 /* Células editadas à mão nos dias que não estão travados por inteiro (ou seja,
    de hoje em diante): o gerador passa a montar o dia em volta delas. */
 function presasDoMes(ano, mes, travas) {
@@ -3263,8 +3502,19 @@ function presasDoMes(ano, mes, travas) {
   }
   return Object.keys(out).length ? out : null;
 }
-function gerarTudo(travarPassado) {
+/* gerarTudo(travarPassado, completo)
+   Por padrão (completo !== true) a escala que já existe NÃO é regerada: os
+   meses prontos só recebem de novo ausências, edições manuais e ajustes de
+   operador; só os meses que ainda não existem são gerados, continuando o
+   rodízio. A regeração completa só acontece quando o usuário pede no botão
+   "Gerar escala". */
+const MOTOR_ATUAL = 2;
+function gerarTudo(travarPassado, completo) {
   if (!S.ops.length) { aviso('Cadastre operadores antes de gerar.'); return; }
+  // Escala salva pela versão antiga do gerador (com letras sumindo, 3
+  // madrugadas etc.): é refeita UMA vez, de hoje em diante. Depois de salvar,
+  // vale a regra nova — a escala pronta não muda mais sozinha.
+  if (S.motor !== MOTOR_ATUAL) { completo = true; travarPassado = true; }
   if (travarPassado !== false) travarDiasPassados();
   limparAusenciasVencidas();
   const [a0, m0] = (S.mesIni || paraIso(new Date()).slice(0, 7)).split('-').map(Number);
@@ -3313,7 +3563,13 @@ function gerarTudo(travarPassado) {
   for (let i = 0; i < S.nMeses; i++) {
     const chaveAtual = chaveMes(a, m);
     const existente = S.historico[chaveAtual];
-    if (ehMesExterno(existente) && existente !== S.mesReferencia) {
+    if (completo !== true && existente && existente.escala && existente.base && !ehMesExterno(existente)) {
+      // mês pronto: fica como está
+      ressincronizarMes(existente);
+      estados = estadosAoFimDe(existente, estados);
+      meses.push(existente);
+      resAnterior = existente;
+    } else if (ehMesExterno(existente) && existente !== S.mesReferencia) {
       // Mês veio de fora (importado / carregado de outro arquivo): NÃO regera
       // por cima, senão a escala importada seria jogada fora. Só reaplica o
       // cadastro atual (ausências + edições manuais) e continua o rodízio a
@@ -3352,6 +3608,8 @@ function gerarTudo(travarPassado) {
     [a, m] = proximoMes(a, m);
   }
   meses.forEach(m2 => { if (m2 && m2.ano && m2.mes) S.historico[chaveMes(m2.ano, m2.mes)] = m2; });
+  if (completo !== true) encaixarOperadoresNovos();
+  S.motor = MOTOR_ATUAL;
   // Reaplica o cadastro atual em TODOS os meses guardados — inclusive o mês de
   // referência e os meses que estão fora da janela de geração, que antes
   // ficavam congelados e nunca acompanhavam mudança de ausência/edição.
@@ -3785,6 +4043,7 @@ function desenharCadastro() {
         const estrutural = ['principal', 'secundario', 'tipo', 'aju_especial'].indexOf(prop) >= 0;
         if (estrutural) registrarPasso();
         const eraDoRodizio = ehDoRodizio(o);
+        const catAntes = categoriaOp(o);
         o[prop] = s.value;
         // saiu do MPS pra um polo de rodízio mas o tipo ficou "MPS": ele
         // continuaria preso na linha MPS, então o tipo volta a ser Formado
@@ -3798,20 +4057,23 @@ function desenharCadastro() {
         }
         desenharCadastro();
         if (estrutural) {
-          // a escala se reorganiza sozinha a partir de hoje
-          if (!eraDoRodizio && ehDoRodizio(o)) reorganizarAposTrocaDePolo(o);
-          else gerarTudo();
+          // só ESSE operador muda na escala, de hoje em diante; os outros ficam
+          // exatamente como estão. Troca dentro da mesma categoria (ex.: de um
+          // polo do rodízio pra outro) não mexe em turno nenhum.
+          if (categoriaOp(o) !== catAntes) reencaixarOperador(o);
+          else ressincronizarTodosOsMeses();
+          desenharTudo();
           carimbarAtualizacao();
           const fixo = o.tipo === 'MPS' || polo(o) === 'MPS' || polo(o) === 'Aracaju - 3';
           if (opsDaEscala(S.ops).indexOf(o) < 0) {
             aviso('Cadastro atualizado. Defina uma letra única pra esse operador — com “?” ou letra repetida ele fica fora da escala.', 6000);
             return;
           }
-          aviso(fixo
-            ? `${nomeCurto(o.nome) || o.letra} reposicionado e escala reorganizada a partir de hoje.`
-            : !eraDoRodizio
-              ? `${nomeCurto(o.nome) || o.letra} entrou no rodízio 6x3 a partir de hoje, contando os dias que já tinha trabalhado.`
-              : 'Cadastro atualizado e escala reorganizada a partir de hoje.');
+          aviso(categoriaOp(o) === catAntes
+            ? 'Cadastro atualizado. A escala não precisou mudar.'
+            : fixo
+              ? `${nomeCurto(o.nome) || o.letra} reposicionado a partir de hoje. O resto da escala não mudou.`
+              : `${nomeCurto(o.nome) || o.letra} entrou no rodízio 6x3 a partir de hoje, no turno mais vazio de cada dia. O resto da escala não mudou.`);
         }
       };
       return s;
@@ -4993,7 +5255,7 @@ function dadosDoProjeto() {
     minDiurno: S.minDiurno, mesIni: S.mesIni, nMeses: S.nMeses, compactaFolga: S.compactaFolga,
     manual: S.manual, estadoInicial: S.estadoInicial, idx: S.idx, turnosOcultos: Array.from(S.turnosOcultos),
     atualizadoEm: S.atualizadoEm, atualizadoHora: S.atualizadoHora, atualizadoPor: S.atualizadoPor, corManual: S.corManual, notas: S.notas,
-    mesReferencia: S.mesReferencia, equilibrarFds: S.equilibrarFds, historico: S.historico,
+    mesReferencia: S.mesReferencia, equilibrarFds: S.equilibrarFds, historico: S.historico, motor: S.motor,
     admins: carregarAdmins()
   };
 }
@@ -5109,6 +5371,7 @@ function carregarProjeto(d) {
   S.mesReferencia = d.mesReferencia || null;
   S.equilibrarFds = !!d.equilibrarFds;
   S.historico = d.historico || {};
+  S.motor = d.motor || 1;
   if (Array.isArray(d.admins)) mesclarAdmins(d.admins);
   // o mês de referência e a cópia dele dentro do histórico chegam como dois
   // objetos separados depois do JSON — religa nos dois sentidos
@@ -5851,16 +6114,16 @@ $('#btGerarConfirma').onclick = () => {
     S.estadoInicial = clonar(res.estados);
     S.mesReferencia = null;
     sincronizar();
-    gerarTudo();
+    gerarTudo(true, true);
     carimbarAtualizacao();
     aviso(`Continuando a partir de ${MESES[prMes - 1]}/${prAno}, na sequência de ${MESES[res.mes - 1]}/${res.ano}.`);
     return;
   }
-  gerarTudo(); carimbarAtualizacao(); aviso('Escala gerada. As edições manuais foram mantidas.');
+  gerarTudo(true, true); carimbarAtualizacao(); aviso('Escala gerada. As edições manuais foram mantidas.');
 };
 $('#btSalvarOps').onclick = () => {
   const recalcularPassado = $('#fRecalcularPassado').checked;
-  gerarTudo(!recalcularPassado);
+  gerarTudo(!recalcularPassado, recalcularPassado);
   carimbarAtualizacao();
   aviso(recalcularPassado
     ? 'Alterações salvas e escala recalculada, inclusive dias que já passaram.'
@@ -5878,7 +6141,7 @@ $('#btMesExterno').onclick = () => {
   delete atual.externo;
   delete atual.base; delete atual.baseArquivo; delete atual.cicloEncaixe; delete atual.reposAplicada;
   if (S.mesReferencia && S.mesReferencia === atual) S.mesReferencia = null;
-  gerarTudo(false);
+  gerarTudo(false, true);
   carimbarAtualizacao();
   aviso('Mês liberado e regerado.');
 };
@@ -5938,7 +6201,7 @@ $('#btRemoverMesReferencia').onclick = () => {
   S.mesReferencia = null;
   S.estadoInicial = null;
   atualizarAvisoMesReferencia();
-  gerarTudo();
+  gerarTudo(true, true);
   aviso('Mês de referência removido. A escala volta a ser gerada do zero.');
 };
 $('#arquivoJsonModal').onchange = e => {
