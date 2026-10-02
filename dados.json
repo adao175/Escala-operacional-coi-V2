@@ -3565,7 +3565,7 @@
    "n_total": 4
   }
  },
- "idx": 0,
+ "idx": 1,
  "turnosOcultos": [],
  "atualizadoEm": "2026-10-01",
  "atualizadoHora": "21:37",
@@ -37896,7 +37896,7 @@
   },
   {
    "login": "cvdc",
-   "hash": "34b8e6fc"
+   "hash": "8f3ce63e"
   }
  ]
 }
