@@ -6791,9 +6791,19 @@ async function carregarDadosPublicados() {
   if (publicado) { S.ops = S.ops.map(normalizarOp); }
   sincronizar();
   gerarTudo();
+  irParaMesCorrente();
   desenharInformacoes();
   aplicarModoEdicao();
 })();
+/* Ao abrir a página, a grade já aparece no mês corrente (se ele existir no
+   histórico). Só muda qual mês é exibido — nenhuma regra de geração é tocada. */
+function irParaMesCorrente() {
+  const h = new Date();
+  const i = S.meses.findIndex(m => m.ano === h.getFullYear() && m.mes === h.getMonth() + 1);
+  if (i < 0) return;
+  S.idx = i;
+  desenharTudo();
+}
 </script>
 </body>
 </html>
