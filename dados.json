@@ -3954,8 +3954,8 @@
  "idx": 1,
  "turnosOcultos": [],
  "atualizadoEm": "2026-10-09",
- "atualizadoHora": "06:22",
- "atualizadoPor": "ldsm4",
+ "atualizadoHora": "06:33",
+ "atualizadoPor": "cvdc",
  "corManual": {
   "2026-9|10-18|1|N": "he",
   "2026-9|10-18|1|B": "he",
@@ -15655,9 +15655,9 @@
       "S"
      ],
      "17": [
+      "M",
       "Q",
-      "S",
-      "M"
+      "S"
      ],
      "18": [
       "Q",
