@@ -3880,11 +3880,12 @@
   "2026-10|SOBREAVISO|11": [],
   "2026-10|14-22|21": [
    "U",
+   "4",
    "N",
    "F",
-   "I",
+   "K",
    "#",
-   "4"
+   "I"
   ],
   "2026-10|06-14|21": [
    "E",
@@ -4046,7 +4047,7 @@
  "idx": 1,
  "turnosOcultos": [],
  "atualizadoEm": "2026-10-12",
- "atualizadoHora": "16:53",
+ "atualizadoHora": "16:57",
  "atualizadoPor": "cvdc",
  "corManual": {
   "2026-9|10-18|1|N": "he",
