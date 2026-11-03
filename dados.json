@@ -615,13 +615,7 @@
    "prioridade_aju": 99,
    "prioridade_polo_principal": 4,
    "prioridade_polo_secundario": 2,
-   "ausencias": [
-    {
-     "inicio": "2026-10-05",
-     "fim": "2026-11-02",
-     "motivo": "Férias"
-    }
-   ]
+   "ausencias": []
   }
  ],
  "metaM": 8,
@@ -4820,10 +4814,9 @@
    "U",
    "J",
    "C",
-   "X",
+   "2",
    "W",
-   "H",
-   "2"
+   "H"
   ],
   "2026-12|06-14|1": [
    "E",
@@ -5555,6 +5548,30 @@
    "A",
    "K",
    "Z"
+  ],
+  "2026-11|10-18|2": [],
+  "2026-11|14-22|2": [
+   "J",
+   "2",
+   "C",
+   "X",
+   "H",
+   "W",
+   "F"
+  ],
+  "2026-11|MPS|2": [],
+  "2026-11|TREINAMENTO|2": [],
+  "2026-11|FERIAS|2": [
+   "Y",
+   "Q",
+   "S"
+  ],
+  "2026-11|ATESTADO|2": [],
+  "2026-11|ACT|2": [],
+  "2026-11|BANCO_HORAS|2": [],
+  "2026-11|SOBREAVISO|2": [],
+  "2026-11|ATESTADO|3": [
+   "X"
   ]
  },
  "estadoInicial": {
@@ -5704,10 +5721,10 @@
    "n_total": 4
   }
  },
- "idx": 1,
+ "idx": 2,
  "turnosOcultos": [],
- "atualizadoEm": "2026-11-02",
- "atualizadoHora": "15:00",
+ "atualizadoEm": "2026-11-03",
+ "atualizadoHora": "12:47",
  "atualizadoPor": "ldsm4",
  "corManual": {
   "2026-9|10-18|1|N": "he",
@@ -20463,10 +20480,9 @@
       "U",
       "J",
       "C",
-      "X",
+      "2",
       "W",
-      "H",
-      "2"
+      "H"
      ],
      "4": [
       "U",
@@ -21692,7 +21708,9 @@
     "ATESTADO": {
      "1": [],
      "2": [],
-     "3": [],
+     "3": [
+      "X"
+     ],
      "4": [],
      "5": [],
      "6": [],
