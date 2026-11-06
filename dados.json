@@ -5902,7 +5902,7 @@
  "idx": 2,
  "turnosOcultos": [],
  "atualizadoEm": "2026-11-06",
- "atualizadoHora": "15:57",
+ "atualizadoHora": "16:02",
  "atualizadoPor": "ldsm4",
  "corManual": {
   "2026-9|10-18|1|N": "he",
@@ -5965,7 +5965,8 @@
   "2026-11|22-06|7|$": "permuta",
   "2026-11|MPS|7|9": "he",
   "2026-11|14-22|8|B": "permuta",
-  "2026-11|22-06|8|#": "permuta"
+  "2026-11|22-06|8|#": "permuta",
+  "2026-11|10-18|8|M": "he"
  },
  "notas": {
   "C:2026-9|1": {
