@@ -2,6 +2,36 @@
  "versao": 1,
  "ops": [
   {
+   "letra": "G",
+   "nome": "gABRIEL",
+   "login": "",
+   "principal": "Aracaju - 2",
+   "secundario": "Aracaju - 2",
+   "tipo": "Formado",
+   "aju_especial": "Não",
+   "sem_madrugada": false,
+   "duas_madrugadas": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 6,
+   "prioridade_polo_secundario": 5,
+   "ausencias": []
+  },
+  {
+   "letra": "*",
+   "nome": "Lucas Menezes",
+   "login": "",
+   "principal": "Aracaju - 2",
+   "secundario": "Aracaju - 2",
+   "tipo": "Formado",
+   "aju_especial": "Não",
+   "sem_madrugada": false,
+   "duas_madrugadas": false,
+   "prioridade_aju": 99,
+   "prioridade_polo_principal": 5,
+   "prioridade_polo_secundario": 4,
+   "ausencias": []
+  },
+  {
    "letra": "3",
    "nome": "TAYNISSON",
    "login": "",
@@ -6173,12 +6203,17 @@
    "ciclo": 8,
    "ultimo_turno": "FOLGA",
    "n_total": 4
+  },
+  "G": {
+   "ciclo": 1,
+   "ultimo_turno": "06-14",
+   "n_total": 0
   }
  },
  "idx": 2,
  "turnosOcultos": [],
  "atualizadoEm": "2026-11-17",
- "atualizadoHora": "16:29",
+ "atualizadoHora": "16:52",
  "atualizadoPor": "cvdc",
  "corManual": {
   "2026-9|10-18|1|N": "he",
