@@ -4760,7 +4760,8 @@
    "H",
    "*",
    "S",
-   "D"
+   "D",
+   "P"
   ],
   "2026-11|06-14|19": [
    "J",
@@ -6054,9 +6055,7 @@
   "2026-11|ATESTADO|20": [
    "9"
   ],
-  "2026-11|SOBREAVISO|18": [
-   "P"
-  ]
+  "2026-11|SOBREAVISO|18": []
  },
  "estadoInicial": {
   "1": {
@@ -6213,7 +6212,7 @@
  "idx": 2,
  "turnosOcultos": [],
  "atualizadoEm": "2026-11-17",
- "atualizadoHora": "17:16",
+ "atualizadoHora": "17:21",
  "atualizadoPor": "cvdc",
  "corManual": {
   "2026-9|10-18|1|N": "he",
