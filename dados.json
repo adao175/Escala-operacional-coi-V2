@@ -5906,8 +5906,8 @@
    "A",
    "S",
    "G",
-   "F",
-   "X"
+   "X",
+   "F"
   ],
   "2026-11|10-18|19": [
    "2"
@@ -6228,7 +6228,7 @@
  "idx": 2,
  "turnosOcultos": [],
  "atualizadoEm": "2026-11-18",
- "atualizadoHora": "20:53",
+ "atualizadoHora": "20:57",
  "atualizadoPor": "cvdc",
  "corManual": {
   "2026-9|10-18|1|N": "he",
@@ -21288,8 +21288,8 @@
       "A",
       "S",
       "G",
-      "F",
-      "X"
+      "X",
+      "F"
      ],
      "20": [
       "A",
